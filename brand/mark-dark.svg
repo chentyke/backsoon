@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="BackSoon">
+  <title>BackSoon</title>
+  <mask id="bs-cut" maskUnits="userSpaceOnUse" x="-8" y="-8" width="80" height="80">
+    <rect x="-8" y="-8" width="80" height="80" fill="#fff"/>
+    <path d="M43.6 34.4v4.9a3.8 3.8 0 0 1-3.8 3.8H21.4M27 37.6l-5.6 5.5 5.6 5.5" fill="none" stroke="#000" stroke-width="4.3" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="15.2" cy="33.2" r="2.15" fill="#000"/>
+    <circle cx="48.8" cy="33.2" r="2.15" fill="#000"/>
+  </mask>
+  <path transform="rotate(-6 32 42)" d="M14.15 27.5H49.85C56.95 27.5 60 30.55 60 37.65V46.85C60 53.95 56.95 57 49.85 57H14.15C7.04 57 4 53.95 4 46.85V37.65C4 30.55 7.04 27.5 14.15 27.5Z" fill="#A9B7FF" mask="url(#bs-cut)"/>
+  <path d="M14.37 35.00 32 9.6 47.79 31.49" fill="none" stroke="#FAF7EF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="32" cy="9.6" r="4.6" fill="#F3A41D"/>
+  <circle cx="30.6" cy="8.2" r="1.3" fill="#fff" fill-opacity=".38"/>
+</svg>

@@ -1,0 +1,47 @@
+{
+  "name": "backsoon",
+  "version": "0.1.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chentyke/backsoon.git"
+  },
+  "homepage": "https://backsoon.dev",
+  "description": "Run background commands and send the result back to the originating Codex chat.",
+  "type": "module",
+  "bin": {
+    "backsoon": "backsoon"
+  },
+  "files": [
+    "backsoon",
+    "src/*.js",
+    "src/web/*.html",
+    "src/web/*.js",
+    "src/web/*.css",
+    "brand/*.svg",
+    "brand/*.png",
+    "brand/README.md",
+    "skills/backsoon/SKILL.md",
+    "README.*.md",
+    "CONTRIBUTING.md",
+    "brand/README.zh-CN.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "test:panel": "playwright test tests/panel.spec.js"
+  },
+  "dependencies": {
+    "koffi": "^3.3.8",
+    "ws": "^8.23.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1"
+  }
+}

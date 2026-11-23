@@ -1,0 +1,14 @@
+.backsoon/
+.threadchime/
+__pycache__/
+*.pyc
+.threadchime-deps/
+.DS_Store
+.env
+.env.*
+!.env.example
+node_modules/
+*.tgz
+dist/
+test-results/
+playwright-report/

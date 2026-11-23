@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-msg="pageTitle">Background tasks | BackSoon</title>
+  <link rel="icon" type="image/svg+xml" href="/brand/mark.svg">
+  <link rel="icon" type="image/svg+xml" href="/brand/mark-dark.svg" media="(prefers-color-scheme: dark)">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" type="module"></script>
+</head>
+<body>
+  <header><div class="bar">
+    <picture class="brand">
+      <source media="(prefers-color-scheme: dark)" srcset="/brand/logo-dark.svg">
+      <img src="/brand/logo.svg" width="122" height="26" alt="BackSoon">
+    </picture>
+    <label class="picker"><select id="language" aria-label="Language" data-label="language">
+      <option value="en" lang="en">English</option>
+      <option value="zh-CN" lang="zh-CN">简体中文</option>
+      <option value="zh-TW" lang="zh-Hant">繁體中文</option>
+      <option value="ja" lang="ja">日本語</option>
+      <option value="ko" lang="ko">한국어</option>
+    </select></label>
+    <span id="connection" role="status" data-msg="connecting">Connecting</span>
+  </div></header>
+  <main>
+    <h1 data-msg="heading">Background tasks</h1>
+    <section id="running" aria-labelledby="running-title">
+      <h2 id="running-title"><span data-msg="running">Running</span> <span class="count"></span></h2>
+      <div class="tasks"></div><p class="empty" hidden data-msg="noRunning">No tasks running</p>
+    </section>
+    <section id="ended" aria-labelledby="ended-title">
+      <h2 id="ended-title"><span data-msg="ended">Finished</span> <span class="count"></span></h2>
+      <div class="tasks"></div><p class="empty" hidden data-msg="noEnded">No finished tasks yet</p>
+    </section>
+  </main>
+  <template id="task">
+    <article class="card">
+      <button type="button" class="summary" aria-haspopup="dialog" aria-controls="task-window" aria-expanded="false">
+        <span class="glyph" aria-hidden="true"></span>
+        <span class="identity">
+          <strong></strong>
+          <span class="meta"><span class="status"></span><span class="duration"></span><span class="context" hidden></span></span>
+        </span>
+        <span class="aside">
+          <span class="measurement"><span class="track"><span class="fill"></span><progress max="100" aria-label="Task progress" data-label="taskProgress"></progress></span><span class="pct"></span></span>
+          <span class="pips" aria-hidden="true"></span>
+          <span class="outcome"></span>
+        </span>
+      </button>
+    </article>
+  </template>
+  <dialog id="task-window" aria-labelledby="dialog-title">
+    <div class="scrim"></div>
+    <div class="surface" aria-hidden="true" inert><span class="shade"></span></div>
+    <div class="sheet">
+      <div class="dialog-head">
+        <span class="tile" data-rise><span class="glyph" aria-hidden="true"></span></span>
+        <div class="head-text" data-rise><h2 id="dialog-title"></h2><div class="meta"><span class="status"></span><span class="duration"></span></div></div>
+        <button id="dismiss" data-rise aria-label="Close details" data-label="closeWindow" autofocus><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button>
+      </div>
+      <div class="dialog-body">
+        <div class="hero" data-rise>
+          <div class="big"><span class="big-num"></span><span class="big-eta"></span></div>
+          <div class="track hero-track"><span class="fill"></span></div>
+          <div class="tally"><div class="stack"></div><div class="legend"></div></div>
+          <p class="hint" hidden></p>
+        </div>
+        <div id="activities" data-rise hidden></div>
+        <div class="command-box" data-rise>
+          <div data-msg="command">Command</div><code class="command"></code>
+          <button type="button" class="copy" aria-label="Copy command" data-label="copyCommand">
+            <svg class="copy-idle" viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="11" height="11" rx="3"/><path d="M15.5 8.5V7a2.5 2.5 0 0 0-2.5-2.5H7A2.5 2.5 0 0 0 4.5 7v6A2.5 2.5 0 0 0 7 15.5h1.5"/></svg>
+            <svg class="copy-done" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4.5 4.5 8.5-10"/></svg>
+          </button>
+        </div>
+        <div class="console" data-rise><div class="loghead"><span class="live" aria-hidden="true"></span><span data-msg="recentOutput">Recent output</span></div><pre tabindex="0"></pre></div>
+        <details id="metadata" data-rise><summary data-msg="metadata">Task details</summary><dl></dl></details>
+      </div>
+    </div>
+  </dialog>
+</body>
+</html>
