@@ -142,21 +142,27 @@ test('a denied socket warns at launch and the command still runs with its existi
 test('a missing desktop socket warns at startup and preserves a queued result when resume fails', async t => {
   const h = sandbox(t);
   delete h.env.BACKSOON_REMOTE;
+  // macOS limits socket paths to 103 bytes, shorter than its usual temporary directory plus this socket name.
+  const profile = fs.mkdtempSync('/tmp/backsoon-home-');
+  t.after(() => fs.rmSync(profile, {recursive:true, force:true}));
   Object.assign(h.env, {
-    CODEX_HOME: path.join(h.dir, 'empty-profile'),
+    CODEX_HOME: profile,
     CODEX_APP_TOOLS_PIPE_PATH: 'desktop',
     QUEUE_REPLY: 'Warning: message was queued, but could not resume thread',
   });
   const run = await exec(entry, ['start', '--no-panel', '--', 'sh', '-c', 'echo built'], { cwd:h.dir, env:h.env });
   const id = run.stdout.trim();
-  assert.match(run.stderr, /service for resuming idle chats is unreachable/);
+  assert.match(run.stderr, /direct resume service is unreachable/);
   assert.doesNotMatch(run.stderr, /Notifications are enabled|lacks permission/);
   const task = await until(async () => {
     const result = JSON.parse(await h.cli('show', id));
     return result.notice && result;
   });
   assert.equal(task.status, 'succeeded');
-  assert.equal(task.notice.state, 'wake_warning');
+  assert.equal(task.notice.state, 'queued');
+  assert.equal(task.notice.issues, 0);
+  assert.match(task.notice.detail, /ENOENT/);
+  assert.match(task.notice.detail, /could not resume thread/);
   assert.equal(task.notice.retryMessage, undefined);
   assert.deepEqual(h.calls().map(call => call.slice(0, 4)), [['queue', '--resume', '--thread', 'origin']]);
   const queued = await exec(entry, ['start', '--notify', 'queue', '--no-panel', '--', 'true'], { cwd:h.dir, env:h.env });
@@ -179,4 +185,16 @@ test('startup checks the selected WebSocket service without issuing chat request
   assert.equal(await checkNoticeAccess({notify:'steer', remote}), 'wakeUnavailable');
   assert.equal(await checkNoticeAccess({notify:'queue', remote}), 'queueUnavailable');
   assert.equal(await checkNoticeAccess({notify:'off', remote}), null);
+});
+
+test('show reports an earlier resume warning as queued and retains its diagnostics', async t => {
+  const h = sandbox(t);
+  const id = await h.cli('start', '--notify', 'off', '--', 'true');
+  await h.ended(id);
+  const file = path.join(h.env.BACKSOON_HOME, id, 'notice.json');
+  const recorded = { state:'wake_warning', issues:2, detail:'Warning: message queued, but could not resume thread' };
+  fs.writeFileSync(file, JSON.stringify(recorded));
+  assert.deepEqual(JSON.parse(await h.cli('show', id)).notice, {...recorded, state:'queued', issues:1});
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), recorded);
+  await assert.rejects(h.cli('retry-notice', id), /no confirmed unsent/);
 });

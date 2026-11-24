@@ -96,11 +96,8 @@ async function queue(task, message) {
   try {
     const { stdout, stderr } = await exec('codex', args, { timeout: 20000, killSignal: 'SIGKILL' });
     const output = (stdout + '\n' + stderr).trim();
-    return /(warn[^\n]*(?:resum|wake)|(?:resum|wake)[^\n]*(?:fail|unable)|could not resume)/i.test(
-      output,
-    )
-      ? ['wake_warning', output.slice(-1200)]
-      : ['queued', ''];
+    const wakeWarning = /warn[^\n]*(?:resum|wake)|(?:resum|wake)[^\n]*(?:fail|unable)|could not resume/i.test(output);
+    return ['queued', wakeWarning ? output.slice(-1200) : ''];
   } catch (e) {
     if (e.killed || e.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER')
       return ['unknown', msg('partialAck')];

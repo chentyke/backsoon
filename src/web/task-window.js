@@ -7,7 +7,7 @@ import { setGlyph } from './glyphs.js';
 const dialog = document.querySelector('#task-window');
 const sheet = dialog.querySelector('.sheet');
 const groupsBox = sheet.querySelector('#activities');
-const notices = {received: 'received', steered: 'steered', queued: 'queued', wake_warning: 'wakeWarning', failed: 'deliveryFailed', unknown: 'deliveryUnknown'};
+const notices = {received: 'received', steered: 'steered', queued: 'queued', failed: 'deliveryFailed', unknown: 'deliveryUnknown'};
 
 function renderDetails(task) {
   const box = sheet.querySelector("dl");
@@ -108,7 +108,7 @@ function renderHero(task, view) {
   const items = task.activities || [];
   if (view.active && task.attached_pid && !task.progress_script && !items.length &&
       !task.output_files?.length && !task.latest && !task.stage) parts.push(msg('processOnly'));
-  if (task.notice?.state === 'wake_warning') parts.push(msg('wakeWarning'));
+  if (task.notice?.state === 'queued') parts.push(msg('queued'));
   const needs = items.find(item => item.state === 'needsInput');
   if (needs) parts.unshift(format.activityText(needs) + ' — ' + msg('needsInput'));
   hint.textContent = parts.filter(Boolean).join(' / ');

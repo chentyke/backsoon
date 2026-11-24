@@ -111,6 +111,11 @@ export function status(dir) {
   }
   task.percent = taskPercent(task);
   task.notice = optional(path.join(dir, 'notice.json'));
+  // Older records counted a failed resume request as a delivery issue after queueing succeeded.
+  if (task.notice?.state === 'wake_warning') {
+    task.notice.state = 'queued';
+    task.notice.issues = Math.max(0, (task.notice.issues ?? 1) - 1);
+  }
   return task;
 }
 export function records(root) {
