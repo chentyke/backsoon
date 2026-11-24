@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>BackSoon · Background tasks for Codex</title>
-<meta name="description" content="BackSoon lets Codex hand off long commands instead of babysitting them. No tokens spent polling, no build logs in the context, and a short result back in the chat that started it.">
+<meta name="description" content="Leave long commands running. BackSoon takes builds, tests and CI waits off Codex’s hands and brings one short line back to the chat that started them. No polling. No log clutter. No tokens spent waiting.">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f4f5">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0e0e10">
 <meta property="og:type" content="website">
 <meta property="og:title" content="BackSoon · Background tasks for Codex">
-<meta property="og:description" content="Codex steps away. The work keeps going. Long commands run in the background and a short result returns to the chat that started them.">
+<meta property="og:description" content="Leave it running. It’ll be back soon. Long commands run in the background, and one short line returns to the chat that started them.">
 <meta property="og:url" content="https://backsoon.dev/">
 <meta property="og:image" content="https://backsoon.dev/social.png">
 <link rel="canonical" href="https://backsoon.dev/">
@@ -23,8 +23,8 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preload" href="fonts/bricolage.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="style.css">
-<script type="module" src="main.js"></script>
+<link rel="stylesheet" href="style.css?v=2">
+<script type="module" src="main.js?v=2"></script>
 </head>
 <body>
 <svg width="0" height="0" class="defs" aria-hidden="true">
@@ -57,7 +57,14 @@
       <a href="#features" data-i18n="navFeatures">Features</a>
       <a href="#start" data-i18n="navStart">Get started</a>
     </nav>
-    <span class="picker"><select id="language" data-i18n-label="language" aria-label="Language"></select></span>
+    <div class="picker">
+      <button class="picker-button" type="button" id="language" aria-haspopup="listbox" aria-expanded="false" aria-controls="language-menu">
+        <span class="sr-only" data-i18n="language">Language</span>
+        <span class="picker-value">English</span>
+        <svg class="picker-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5 8 10l3.5-3.5"/></svg>
+      </button>
+      <div class="picker-menu" id="language-menu" role="listbox" tabindex="-1" data-i18n-label="language" aria-label="Language" hidden><span class="picker-hilite" aria-hidden="true"></span></div>
+    </div>
     <a class="nav-gh" href="https://github.com/chentyke/backsoon" data-i18n-label="ghLabel" aria-label="BackSoon on GitHub">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
       <span>GitHub</span>
@@ -68,9 +75,12 @@
 <main id="top">
   <section class="hero">
     <p class="eyebrow" data-rise><span class="dot"></span><span data-i18n="eyebrow">Background tasks for Codex</span></p>
-    <h1 data-rise data-i18n-html="heroHtml">Codex steps away.<br><span class="soft">The work keeps going.</span></h1>
-    <p class="lede" data-rise data-i18n="lede">BackSoon runs long commands in the background and brings a short result back to the chat that started them. No tokens spent polling. No build logs crowding the context.</p>
-    <div class="install" data-rise><code class="cmd-line"><span class="c-p">$</span> npm i -g backsoon &amp;&amp; backsoon setup</code><button class="copy" type="button" data-i18n-label="copy" aria-label="Copy the install command"><svg class="copy-idle" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="3"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg><svg class="copy-done" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button></div>
+    <h1 data-rise data-i18n-html="heroHtml">Codex clocks out.<br><span class="soft">The work doesn’t.</span></h1>
+    <p class="lede" data-rise data-i18n="lede">Builds. Test suites. Downloads. CI. BackSoon takes the long jobs off Codex’s hands, then brings back a single line when they’re done. No polling. No log clutter. Nothing spent on the wait.</p>
+    <div class="install-wrap" data-rise>
+      <div class="install"><code class="cmd-line"><span class="c-p">$</span> npm i -g backsoon &amp;&amp; backsoon setup</code><button class="copy" type="button" data-i18n-label="copy" aria-label="Copy the install command"><svg class="copy-idle" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="3"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg><svg class="copy-done" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button></div>
+      <p class="scribble"><svg class="to-side" viewBox="0 0 48 36" aria-hidden="true"><path pathLength="1" d="M46 28C34 30 18 26 7 10"/><path pathLength="1" d="M6.9 18 7 10l7.5 2.8"/></svg><svg class="to-above" viewBox="0 0 48 36" aria-hidden="true"><path pathLength="1" d="M44 31C35 31 22 27 15 19 11 14 9.5 10 9 5.5"/><path pathLength="1" d="M3.6 11.2 9 4.6l5.6 6"/></svg><span data-i18n="scribble">Or just hand this to Codex. It knows what to do.</span></p>
+    </div>
     <div class="ctas" data-rise>
       <a class="btn primary" href="#start"><span data-i18n="ctaStart">Get started</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5"/></svg></a>
       <a class="btn" href="https://github.com/chentyke/backsoon" data-doc="readme" data-i18n="ctaGithub">View on GitHub</a>
@@ -97,14 +107,14 @@
         </div>
       </div>
       <div class="toasts" aria-live="polite"></div>
-      <p class="stage-hint" data-i18n="stageHint">Live demo. Select a task to open its window.</p>
+      <p class="stage-hint" data-i18n="stageHint">This is live. Click any task to take a look inside.</p>
     </div>
   </section>
 
   <section class="block" id="context">
     <div class="intro" data-reveal>
       <p class="kicker" data-i18n="kContext">Tokens and context</p>
-      <h2 data-i18n="ctxTitle">Waiting shouldn’t cost anything.</h2>
+      <h2 data-i18n="ctxTitle">Fourteen minutes. Not a single token.</h2>
       <p data-i18n="ctxBody"></p>
     </div>
 
@@ -147,7 +157,7 @@
   <section class="block" id="rows">
     <div class="intro" data-reveal>
       <p class="kicker" data-i18n="kPanel">The panel</p>
-      <h2 data-i18n="rowsTitle">A row for every situation.</h2>
+      <h2 data-i18n="rowsTitle">Every state. At a glance.</h2>
       <p data-i18n="rowsBody"></p>
     </div>
     <div class="gallery" data-reveal></div>
@@ -156,12 +166,12 @@
   <section class="block" id="features">
     <div class="intro" data-reveal>
       <p class="kicker" data-i18n="kFeatures">Features</p>
-      <h2 data-i18n="featTitle">Hands off, never out of the loop.</h2>
+      <h2 data-i18n="featTitle">Out of your hands. Never out of the loop.</h2>
     </div>
     <div class="bento">
       <article class="tile wide" data-reveal>
         <div class="tile-text">
-          <h3 data-i18n="f1t">Reports back to the right chat</h3>
+          <h3 data-i18n="f1t">Finds its way back</h3>
           <p data-i18n="f1b"></p>
         </div>
         <div class="tile-art notice-art">
@@ -180,7 +190,7 @@
 
       <article class="tile" data-reveal>
         <div class="tile-text">
-          <h3 data-i18n="f2t">Understands common tools</h3>
+          <h3 data-i18n="f2t">Fluent in your tools</h3>
           <p data-i18n="f2b"></p>
         </div>
         <div class="tile-art chips">
@@ -190,7 +200,7 @@
 
       <article class="tile" data-reveal>
         <div class="tile-text">
-          <h3 data-i18n="f3t">Measures your own work</h3>
+          <h3 data-i18n="f3t">Measure anything</h3>
           <p data-i18n="f3b"></p>
         </div>
         <pre class="tile-art code"><span class="c-k">{</span>
@@ -202,7 +212,7 @@
 
       <article class="tile" data-reveal>
         <div class="tile-text">
-          <h3 data-i18n="f4t">Alerts while it runs</h3>
+          <h3 data-i18n="f4t">Speaks up early</h3>
           <p data-i18n="f4b"></p>
         </div>
         <div class="tile-art alert-art">
@@ -213,7 +223,7 @@
 
       <article class="tile" data-reveal>
         <div class="tile-text">
-          <h3 data-i18n="f5t">Watches what’s already running</h3>
+          <h3 data-i18n="f5t">Already running? Already covered.</h3>
           <p data-i18n="f5b"></p>
         </div>
         <div class="tile-art code-lines">
@@ -238,24 +248,24 @@
   <section class="block" id="how">
     <div class="intro" data-reveal>
       <p class="kicker" data-i18n="kHow">How it works</p>
-      <h2 data-i18n="howTitle">Three steps, one short line back.</h2>
+      <h2 data-i18n="howTitle">Hand&nbsp;it&nbsp;off. Move&nbsp;on. Hear&nbsp;back.</h2>
     </div>
     <ol class="steps">
       <li data-reveal>
         <span class="step-n">1</span>
-        <h3 data-i18n="s1t">Codex starts it</h3>
+        <h3 data-i18n="s1t">Hand it off</h3>
         <p data-i18n="s1b"></p>
         <code class="step-code">backsoon start -- npm run build</code>
       </li>
       <li data-reveal>
         <span class="step-n">2</span>
-        <h3 data-i18n="s2t">The turn ends</h3>
+        <h3 data-i18n="s2t">Move on</h3>
         <p data-i18n="s2b"></p>
         <span class="step-row"><span class="mini-glyph spin"></span><span data-i18n="running">Running</span> <em>62%</em></span>
       </li>
       <li data-reveal>
         <span class="step-n">3</span>
-        <h3 data-i18n="s3t">The result comes back</h3>
+        <h3 data-i18n="s3t">Hear back</h3>
         <p data-i18n="s3b"></p>
         <span class="step-row done"><span class="mini-glyph ok"></span><span class="s3-row"></span></span>
       </li>
@@ -266,7 +276,7 @@
     <div class="get" data-reveal>
       <div class="get-text">
         <p class="kicker" data-i18n="kStart">Get started</p>
-        <h2 data-i18n="getTitle">Install it in a minute.</h2>
+        <h2 data-i18n="getTitle">One command. One minute.</h2>
         <p class="get-body" data-i18n="getBody"></p>
         <dl class="reqs">
           <dt data-i18n="reqLabel">System requirements</dt>
@@ -293,6 +303,38 @@
         </li>
         <li>
           <span class="get-n">2</span>
+          <div class="get-step">
+            <h3 data-i18n="stepTrust">Trust the completion hooks</h3>
+            <div class="guide-card">
+              <div class="gc-head">
+                <span class="gc-tile" aria-hidden="true">
+                  <svg class="gc-mark" viewBox="0 0 64 64">
+                    <g class="gc-sign">
+                      <path class="m-sign" transform="rotate(-6 32 42)" d="M14.15 27.5H49.85C56.95 27.5 60 30.55 60 37.65V46.85C60 53.95 56.95 57 49.85 57H14.15C7.04 57 4 53.95 4 46.85V37.65C4 30.55 7.04 27.5 14.15 27.5Z" mask="url(#cut)"/>
+                      <path class="m-string" d="M14.37 35.00 32 9.6 47.79 31.49"/>
+                    </g>
+                    <circle class="m-pin" cx="32" cy="9.6" r="4.6"/>
+                  </svg>
+                  <span class="gc-check"><svg viewBox="0 0 24 24"><path d="M7.6 12.4l3 3 5.8-6.4"/></svg></span>
+                </span>
+                <span class="gc-title"><b data-i18n="gTitle">Set up BackSoon</b><span data-i18n="gAllSet">All set</span></span>
+              </div>
+              <div class="gc-row" data-tone="green">
+                <svg class="gc-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M7.6 12.4l3 3 5.8-6.4"/></svg>
+                <span data-i18n="gHooks">Completion notifications</span>
+                <em data-i18n="gReady">Ready</em>
+              </div>
+              <div class="gc-row" data-tone="blue">
+                <svg class="gc-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path class="gc-spark" d="M12 6.6l1.45 3.95 3.95 1.45-3.95 1.45L12 17.4l-1.45-3.95L6.6 12l3.95-1.45z"/></svg>
+                <span data-i18n="gRules">Global instructions</span>
+                <em class="gc-pill" data-i18n="gRecommended">Recommended</em>
+              </div>
+            </div>
+            <p class="trust-note" data-i18n-html="trustHtml">In the Codex app, <b>Settings</b> › <b>Hooks</b> › <b>Trust all</b>.<br>In the CLI, <code>/hooks</code>.</p>
+          </div>
+        </li>
+        <li>
+          <span class="get-n">3</span>
           <div class="get-step">
             <h3 data-i18n="stepAsk">Then ask Codex in a new chat</h3>
             <div class="ask"><p class="ask-bubble" data-i18n-html="askHtml"></p></div>
