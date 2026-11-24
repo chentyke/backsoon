@@ -232,8 +232,22 @@ export function sample(task, dir, pid, signal) {
       bytes = 0;
     const chunks = [];
     function stop(message) {
-      error ??= Error(message);
-      signalGroup(child.pid, 'SIGKILL');
+      if (error) return;
+      error = Error(message);
+      try {
+        signalGroup(child.pid, 'SIGKILL');
+      } catch {
+        // The group can disappear or become unsignalable while its pipes still have data.
+        child.stdout.destroy();
+        child.stderr.destroy();
+        try {
+          child.kill('SIGKILL');
+        } catch {
+          // Preserve the sampling error if the OS also refuses the child signal.
+        }
+        child.unref();
+        reject(error);
+      }
     }
     const abort = () => stop(msg('scriptStopped'));
     const timer = setTimeout(() => stop(msg('scriptTimeout')), 5000);
@@ -246,19 +260,19 @@ export function sample(task, dir, pid, signal) {
         else stop(msg('scriptLarge'));
       });
     child.on('error', (e) => {
-      error = e;
+      error ??= e;
     });
     child.once('close', (code) => {
       clearTimeout(timer);
       signal.removeEventListener('abort', abort);
-      signalGroup(child.pid, 'SIGKILL');
       try {
+        signalGroup(child.pid, 'SIGKILL');
         if (error) throw error;
         const raw = Buffer.concat(chunks).toString();
         if (code !== 0) throw Error(msg('scriptExit', { code, output: raw.trim().slice(-240) }));
         resolve({ ...parseReport(raw), sampled_at: now(), progress_error: null });
       } catch (e) {
-        reject(e);
+        reject(error ?? e);
       }
     });
   });

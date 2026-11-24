@@ -123,6 +123,18 @@ test('sampling enforces byte and time limits', async (t) => {
   await assert.rejects(run(), { message: msg('scriptTimeout') });
 });
 
+test('a refused group signal preserves the output limit error', async t => {
+  const h = sandbox(t);
+  h.write('sample.mjs', "process.stdout.write('x'.repeat(9000)); setInterval(() => {}, 1000)");
+  const kill = process.kill.bind(process);
+  t.mock.method(process, 'kill', (pid, signal) => {
+    if (pid < 0 && signal === 'SIGKILL') throw Object.assign(Error('kill EPERM'), {code:'EPERM'});
+    return kill(pid, signal);
+  });
+  const task = { id:'limit', cwd:h.dir, progress_script:path.join(h.dir, 'sample.mjs') };
+  await assert.rejects(sample(task, h.dir, process.pid, new AbortController().signal), {message:msg('scriptLarge')});
+});
+
 for (const file of ['docs/progress.md', 'docs/zh-CN/progress.md']) {
   test(file + ' conversion example reports partial, completed and empty batches', async t => {
     const h = sandbox(t);
