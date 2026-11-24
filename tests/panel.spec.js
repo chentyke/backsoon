@@ -10,6 +10,13 @@ import { catalogs } from '../src/web/i18n.js';
 
 test.use({ channel: process.env.BACKSOON_TEST_BROWSER || undefined });
 
+// The language menu is a button that opens a listbox of languages, each named in its own script.
+async function chooseLanguage(page, locale) {
+  await page.locator('#language').click();
+  await page.locator(`#language-menu [role=option][lang="${locale}"]`).click();
+  await expect(page.locator('#language-menu')).toBeHidden();
+}
+
 let dir, url;
 test.beforeAll(async () => {
   dir = fs.mkdtempSync(path.join(tmpdir(), 'backsoon-browser-'));
@@ -50,8 +57,17 @@ for (const [locale, messages] of Object.entries(catalogs)) {
       await dialog.getByRole('button', { name: messages.closeWindow }).click();
       await expect(dialog).not.toBeVisible();
       const next = locale === 'en' ? 'ja' : 'en';
-      await page.getByRole('combobox', { name: messages.language }).selectOption(next);
+      const picker = page.getByRole('button', { name: messages.language });
+      await picker.click();
+      const menu = page.getByRole('listbox', { name: messages.language });
+      await expect(menu).toBeVisible();
+      await expect(picker).toHaveAttribute('aria-expanded', 'true');
+      await expect(menu.getByRole('option', { selected: true })).toHaveAttribute('lang', locale);
+      await menu.getByRole('option', { name: next === 'en' ? 'English' : '日本語' }).click();
+      await expect(menu).toBeHidden();
       await expect(page.locator('html')).toHaveAttribute('lang', next);
+      // the button and menu are now named in the new language
+      await expect(page.getByRole('button', { name: catalogs[next].language })).toHaveAttribute('aria-expanded', 'false');
       await expect(row.locator('.status')).toHaveText(catalogs[next].succeeded);
       await page.goto(url);
       await expect(dialog.getByRole('button', { name: catalogs[next].closeWindow })).toBeVisible();
@@ -59,6 +75,56 @@ for (const [locale, messages] of Object.entries(catalogs)) {
     });
   });
 }
+
+test('language menu works from the keyboard and closes when focus or a click leaves it', async ({ page }) => {
+  await page.goto(new URL('/', url).href);
+  await chooseLanguage(page, 'en');
+  const picker = page.locator('#language'), menu = page.locator('#language-menu');
+  await picker.focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(menu).toBeVisible();
+  await expect(menu).toBeFocused();
+  await expect(menu).toHaveAttribute('aria-activedescendant', 'language-en');
+  await page.keyboard.press('End');
+  await expect(menu).toHaveAttribute('aria-activedescendant', 'language-ko');
+  await page.keyboard.press('ArrowDown');
+  await expect(menu).toHaveAttribute('aria-activedescendant', 'language-en');
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('ArrowUp');
+  await expect(menu).toHaveAttribute('aria-activedescendant', 'language-ja');
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  await expect(picker).toBeFocused();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+
+  await page.keyboard.press('Enter');
+  await expect(menu).toBeVisible();
+  await page.keyboard.press('Home');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect(menu).toBeHidden();
+  await expect(picker).toBeFocused();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
+  await expect(picker.locator('.picker-value')).toHaveText('简体中文');
+  await expect(page.locator('#language-zh-CN')).toHaveAttribute('aria-selected', 'true');
+
+  // type-ahead, then Space chooses
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('e');
+  await expect(menu).toHaveAttribute('aria-activedescendant', 'language-en');
+  await page.keyboard.press(' ');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+
+  await picker.click();
+  await expect(menu).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect(menu).toBeHidden();
+  await picker.click();
+  await expect(menu).toBeVisible();
+  await page.locator('h1').click();
+  await expect(menu).toBeHidden();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+});
 
 test('compact sidebar keeps checks grouped and unchanged polls preserve expanded shards', async ({ page }) => {
   await page.setViewportSize({ width: 370, height: 650 });
@@ -140,12 +206,12 @@ test('setup guide shows partial, unavailable and confirmed access and supports f
     await page.route('**/api/setup', route => route.fulfill({json:status}));
     await page.goto(reply.value);
     for (const [locale, messages] of Object.entries(catalogs)) {
-      await page.locator('#language').selectOption(locale);
+      await chooseLanguage(page, locale);
       await expect(page).toHaveTitle(messages.guideTitle);
       await expect(page.locator('#rules')).toHaveText(messages.guideAdded);
       await expect(page.locator('#hooks')).toHaveText(messages.guideCount.replace('{trusted}', '1').replace('{total}', '4'));
     }
-    await page.locator('#language').selectOption('en');
+    await chooseLanguage(page, 'en');
     status.trusted = null;
     status.rules = false;
     await page.getByRole('button', {name:'Check again'}).click();
@@ -160,11 +226,11 @@ test('setup guide shows partial, unavailable and confirmed access and supports f
     await page.getByRole('tab', { name: catalogs.en.guideTabCli }).click();
     await expect(page.locator('#how-cli')).toContainText('/hooks');
     await expect(page.locator('#how-desktop')).toBeHidden();
-    await page.locator('#language').selectOption('zh-TW');
+    await chooseLanguage(page, 'zh-TW');
     await page.getByRole('tab', { name: catalogs['zh-TW'].guideTabDesktop }).click();
     await expect(page.locator('#how-desktop')).toContainText(catalogs['zh-TW'].guideAppHooks);
     await expect(page.locator('#preview')).toContainText(catalogs['zh-TW'].agentsRuleStart);
-    await page.locator('#language').selectOption('en');
+    await chooseLanguage(page, 'en');
     await expect(page.locator('#overall')).toHaveText(catalogs.en.guideStateUnknown);
     status.trusted = 4;
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
@@ -199,7 +265,7 @@ test('setup guide adds the recommended rule only after confirmation, and can ski
   try {
     const [reply] = await once(child, 'message');
     await page.goto(reply.value);
-    await page.locator('#language').selectOption('en');
+    await chooseLanguage(page, 'en');
     const rules = page.locator('#step-rules');
     await expect(rules).toHaveAttribute('data-state', 'offer', { timeout: 15000 });
     await expect(page.locator('#preview')).toContainText('backsoon start -- COMMAND');
@@ -213,12 +279,12 @@ test('setup guide adds the recommended rule only after confirmation, and can ski
 
     await page.getByRole('button', { name: catalogs.en.guideReconsider }).click();
     // The rule is written in the language the page shows.
-    await page.locator('#language').selectOption('ja');
+    await chooseLanguage(page, 'ja');
     await page.getByRole('button', { name: catalogs.ja.guideAddRules }).click();
     await expect(rules).toHaveAttribute('data-state', 'added');
     await expect(page.locator('#rules')).toHaveText(catalogs.ja.guideAdded);
     expect(fs.readFileSync(file, 'utf8')).toContain(catalogs.ja.agentsRuleFollowUp);
-    await page.locator('#language').selectOption('en');
+    await chooseLanguage(page, 'en');
 
     await page.getByRole('button', { name: catalogs.en.guideRemoveRules }).click();
     await expect(rules).toHaveAttribute('data-state', 'offer');

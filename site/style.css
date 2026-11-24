@@ -48,9 +48,11 @@
   color: var(--ink);
   font: 16px/1.55 ui-rounded, "SF Pro Rounded", "Open Runde", -apple-system, BlinkMacSystemFont, var(--cjk), sans-serif;
   -webkit-font-smoothing: antialiased;
-  scroll-behavior: smooth;
   scroll-padding-top: 72px;
 }
+/* Smooth only once the page is up: on a reload the browser restores the
+   scroll position, and a smooth restore chases the layout as it settles. */
+:root[data-smooth] { scroll-behavior: smooth; }
 :root:lang(zh-TW) { --cjk: "PingFang TC", "Microsoft JhengHei", "Noto Sans TC"; }
 :root:lang(ja) { --cjk: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP"; }
 :root:lang(ko) { --cjk: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR"; }
@@ -59,7 +61,10 @@
 :root:is(:lang(zh), :lang(ja), :lang(ko)) :is(h1, h2, h3) { letter-spacing: 0; font-weight: 700; }
 :root:is(:lang(zh), :lang(ja), :lang(ko)) .hero h1 { line-height: 1.14; font-size: clamp(34px, 6.6vw, 76px); }
 :root:is(:lang(zh), :lang(ja), :lang(ko)) :is(.intro h2, .get h2) { line-height: 1.18; }
-:root:lang(ja) :is(h1, h2) { word-break: auto-phrase; }
+:root:lang(ja) :is(h1, h2, h3) { word-break: auto-phrase; }
+/* Chinese headlines are short phrases: wrap them at the punctuation, never
+   inside a phrase. */
+:root:lang(zh) :is(h1, h2, h3) { word-break: keep-all; overflow-wrap: break-word; }
 :root:lang(ko) body { word-break: keep-all; overflow-wrap: anywhere; }
 :root:is(:lang(zh-TW), :lang(ja)) q { quotes: "「" "」"; }
 * { box-sizing: border-box; }
@@ -87,9 +92,25 @@ code, pre { font-family: var(--mono); }
 .nav nav a, .nav-gh { padding: 6px 12px; border-radius: 99px; color: var(--muted); font-size: 14px; font-weight: 560; text-decoration: none; transition: color .2s, background-color .2s; }
 .nav nav a:hover, .nav-gh:hover { color: var(--ink); background: var(--faint); }
 .picker { position: relative; display: inline-flex; margin-inline-start: 4px; }
-.picker::after { content: ""; position: absolute; right: 12px; top: 50%; width: 5px; height: 5px; border: solid var(--muted); border-width: 0 1.5px 1.5px 0; transform: translateY(-70%) rotate(45deg); pointer-events: none; }
-#language { appearance: none; -webkit-appearance: none; height: 34px; padding: 0 30px 0 14px; border: 0; border-radius: 99px; background: var(--surface); box-shadow: var(--card-shadow); color: var(--ink); font: inherit; font-size: 13.5px; font-weight: 580; cursor: pointer; }
-#language:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.picker-button { display: inline-flex; align-items: center; gap: 5px; height: 34px; padding: 0 10px 0 14px; border: 0; border-radius: 99px; background: var(--surface); box-shadow: var(--card-shadow); font-size: 13.5px; font-weight: 580; white-space: nowrap; overflow: hidden; transition: box-shadow .2s; }
+.picker-button:hover, .picker[data-open] .picker-button { box-shadow: var(--card-shadow-hover); }
+.picker-button:focus-visible { outline-offset: 2px; border-radius: 99px; }
+.picker-chevron { flex: none; width: 14px; height: 14px; fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; transition: transform var(--menu-dur, .4s) var(--menu-ease, var(--ease-out)); }
+.picker[data-open] .picker-chevron { transform: rotate(180deg); }
+.picker-menu { position: absolute; top: calc(100% + 8px); right: 0; z-index: 1; display: grid; min-width: 172px; padding: 6px; border-radius: 18px; background: var(--surface); box-shadow: var(--float-shadow), 0 0 0 1px var(--line); transform-origin: calc(100% - 24px) 0; outline: none; }
+.picker-menu:focus-visible { outline: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.picker-option { position: relative; display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px 0 10px; border-radius: 12px; font-size: 14px; font-weight: 560; cursor: pointer; white-space: nowrap; user-select: none; -webkit-user-select: none; }
+.picker-option[aria-selected=true] { font-weight: 650; }
+/* each language name in its own script's typeface, whatever the page language */
+:is(.picker-option, .picker-value):lang(zh-CN) { font-family: ui-rounded, -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; }
+:is(.picker-option, .picker-value):lang(zh-TW) { font-family: ui-rounded, -apple-system, "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif; }
+:is(.picker-option, .picker-value):lang(ja) { font-family: ui-rounded, -apple-system, "Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif; }
+:is(.picker-option, .picker-value):lang(ko) { font-family: ui-rounded, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif; }
+.picker-check { flex: none; width: 16px; height: 16px; fill: none; stroke: var(--blue); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transform: scale(.5); transition: opacity .2s, transform var(--menu-dur, .4s) var(--menu-ease, var(--ease-out)); }
+.picker-option[aria-selected=true] .picker-check { opacity: 1; transform: none; }
+/* one highlight that slides between rows */
+.picker-hilite { position: absolute; top: 0; left: 6px; right: 6px; border-radius: 12px; background: var(--faint); opacity: 0; pointer-events: none; transition: transform var(--menu-dur, .38s) var(--menu-ease, var(--ease-out)), height var(--menu-dur, .38s) var(--menu-ease, var(--ease-out)), opacity .15s; }
 .nav-gh { display: inline-flex; align-items: center; gap: 7px; background: var(--surface); box-shadow: var(--card-shadow); color: var(--ink); }
 .nav-gh:hover { background: var(--surface); box-shadow: var(--card-shadow-hover); }
 .nav-gh svg { width: 16px; height: 16px; fill: currentColor; }
@@ -117,6 +138,30 @@ h1, h2, .display { font-family: var(--display); }
 .install .copy { margin: 0; flex: none; width: 34px; height: 34px; border-radius: 11px; color: var(--muted); }
 .install .copy:hover { background: var(--faint); color: var(--ink); }
 .install .copy-done { color: var(--green); }
+/* a handwritten aside: the install line can go straight to Codex */
+.install-wrap { position: relative; display: flex; flex-direction: column; align-items: center; max-width: 100%; }
+.scribble {
+  position: absolute; left: calc(100% + 6px); top: calc(50% + 20px); display: flex; align-items: flex-start; gap: 2px; width: 230px; margin: 0;
+  color: var(--blue); text-align: start; transform: rotate(-3deg); transform-origin: 0 0;
+  font: 600 17px/1.25 "Bradley Hand", "Hannotate SC", "HanziPen SC", "Kaiti SC", "STKaiti", "Segoe Print", "Ink Free", "Chalkboard SE", cursive;
+}
+:lang(zh-TW) .scribble { font-family: "Bradley Hand", "Hannotate TC", "HanziPen TC", "Kaiti TC", "BiauKai", "DFKai-SB", "Segoe Print", "Chalkboard SE", cursive; }
+:lang(ja) .scribble { font-family: "Bradley Hand", "Klee", "Klee One", "YuKyokasho", "Segoe Print", "Chalkboard SE", cursive; }
+:lang(ko) .scribble { font-family: "Bradley Hand", "Nanum Pen Script", "NanumPen", "Segoe Print", "Chalkboard SE", cursive; font-size: 23px; line-height: 1.05; }
+.scribble svg { flex: none; width: 40px; height: 30px; margin-top: -14px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+/* beside the command the arrow points back at it; under it, up at it */
+.scribble .to-above { display: none; }
+.scribble span { padding-top: 6px; text-wrap: pretty; word-break: auto-phrase; }
+.scribble path { stroke-dasharray: 1; animation: scribble-draw .55s 1.05s cubic-bezier(.6, 0, .3, 1) both; }
+.scribble path + path { animation-delay: 1.5s; animation-duration: .25s; }
+.scribble span { animation: scribble-ink .7s 1.2s var(--ease-out) both; }
+@keyframes scribble-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes scribble-ink { from { opacity: 0; filter: blur(3px); transform: translateY(3px); } to { opacity: 1; filter: none; transform: none; } }
+@media (max-width: 1060px) {
+  .scribble { position: static; width: auto; max-width: 300px; margin: 10px 0 -4px 56px; transform: rotate(-2deg); transform-origin: 50% 0; }
+  .scribble .to-side { display: none; }
+  .scribble .to-above { display: block; }
+}
 .ctas { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 16px; }
 .btn {
   display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 22px; border-radius: 99px;
@@ -139,6 +184,9 @@ h1, h2, .display { font-family: var(--display); }
 .online { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; font-weight: 600; }
 .online::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: beacon 2.4s var(--ease-out) infinite; }
 .panel { padding: 18px clamp(12px, 3vw, 28px) 26px; }
+/* The demos move their own contents around. Never let the browser anchor the
+   page's scroll to something inside them, or it drags the page along. */
+.panel, .chat { overflow-anchor: none; }
 .panel-title { margin: 4px 2px 16px; font: 700 22px/1.15 ui-rounded, "SF Pro Rounded", -apple-system, sans-serif; letter-spacing: -.035em; }
 .panel section + section { margin-top: 22px; }
 .panel h3 { display: flex; align-items: center; gap: 8px; margin: 0 4px 10px; font-size: 13px; font-weight: 650; color: var(--muted); }
@@ -381,10 +429,46 @@ button.card:active { transform: scale(.985); }
 .get-steps { display: grid; align-content: center; gap: 0; margin: 0; padding: 24px; border-radius: 28px; background: var(--raised); list-style: none; }
 .get-steps li { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 14px; }
 .get-steps li + li { padding-top: 24px; }
-.get-steps li:first-child::after { content: ""; position: absolute; left: 13.5px; top: 36px; bottom: -16px; width: 1.5px; border-radius: 1px; background: var(--line); }
+.get-steps li:not(:last-child)::after { content: ""; position: absolute; left: 13.5px; top: 36px; bottom: -16px; width: 1.5px; border-radius: 1px; background: var(--line); }
 .get-n { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 99px; background: var(--surface); box-shadow: var(--card-shadow); color: var(--blue); font: 700 13px/1 var(--display); }
 .get-step { display: grid; gap: 12px; min-width: 0; }
 .get-step h3 { margin: 4px 0 0; font-size: 15px; font-weight: 650; line-height: 1.3; }
+/* a miniature of the setup guide, hanging its sign once it scrolls in */
+.guide-card { display: grid; gap: 6px; padding: 14px; border-radius: 22px; background: var(--surface); box-shadow: var(--card-shadow); }
+.gc-head { display: flex; align-items: center; gap: 12px; padding: 2px 2px 8px; }
+.gc-tile { position: relative; display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 13px; background: color-mix(in srgb, var(--blue) 11%, transparent); }
+.gc-tile > * { grid-area: 1 / 1; }
+.gc-mark { width: 30px; height: 30px; margin-top: -2px; overflow: visible; }
+.gc-sign { transform-box: view-box; transform-origin: 32px 9.6px; }
+.gc-check { place-self: end; display: grid; width: 16px; height: 16px; margin: 0 -4px -4px 0; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 2px var(--surface); }
+.gc-check svg { width: 16px; height: 16px; fill: none; stroke: var(--on-tone); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.gc-title { display: grid; min-width: 0; line-height: 1.3; }
+.gc-title b { font-size: 15px; font-weight: 700; letter-spacing: -.02em; }
+.gc-title span { color: var(--green); font-size: 12.5px; font-weight: 620; }
+.gc-row { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 14px; background: var(--raised); font-size: 13.5px; font-weight: 600; }
+.gc-row[data-tone=green] { --tone: var(--green); }
+.gc-row[data-tone=blue] { --tone: var(--blue); }
+.gc-glyph { width: 18px; height: 18px; }
+.gc-glyph circle { fill: var(--tone); }
+.gc-glyph path { fill: none; stroke: var(--on-tone); stroke-width: 2.25; stroke-linecap: round; stroke-linejoin: round; }
+.gc-glyph .gc-spark { fill: var(--on-tone); stroke: none; }
+.gc-row em { color: var(--tone); font-size: 12px; font-style: normal; font-weight: 620; white-space: nowrap; }
+.gc-row .gc-pill { padding: 2px 8px; border-radius: 99px; background: color-mix(in srgb, var(--tone) 12%, transparent); }
+.trust-note { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.6; }
+.trust-note b { padding: 1px 6px; border-radius: 6px; background: var(--surface); box-shadow: 0 0 0 .5px var(--line); color: var(--ink); font-weight: 620; white-space: nowrap; }
+.trust-note code { padding: 1px 6px; border-radius: 6px; background: var(--surface); box-shadow: 0 0 0 .5px var(--line); color: var(--blue); font-size: .92em; font-weight: 600; }
+.js .get[data-shown] .gc-sign { animation: gc-hang 1.7s .55s both; }
+.js .get[data-shown] .gc-check { animation: gc-pop .5s 1.9s cubic-bezier(.34, 1.56, .64, 1) both; }
+@keyframes gc-hang {
+  0% { opacity: 0; transform: translateY(-14px) rotate(-26deg); animation-timing-function: cubic-bezier(.5, 0, .9, .6); }
+  16% { opacity: 1; transform: rotate(-26deg); animation-timing-function: ease-in-out; }
+  32% { transform: rotate(15deg); animation-timing-function: ease-in-out; }
+  48% { transform: rotate(-8deg); animation-timing-function: ease-in-out; }
+  63% { transform: rotate(4deg); animation-timing-function: ease-in-out; }
+  78% { transform: rotate(-1.6deg); animation-timing-function: ease-in-out; }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes gc-pop { from { opacity: 0; transform: scale(.3) rotate(-40deg); } to { opacity: 1; transform: none; } }
 .ask { display: flex; }
 .ask-bubble { flex: 1; margin: 0; padding: 11px 15px; border-radius: 18px 18px 6px 18px; background: var(--blue); color: #fff; font-size: 14.5px; line-height: 1.5; }
 .ask-bubble code { padding: 1px 6px; border-radius: 6px; background: rgb(255 255 255 / .18); font-size: .9em; white-space: nowrap; }
@@ -547,7 +631,7 @@ button.card:active { transform: scale(.985); }
   .sheet { width: calc(100% - 16px); margin-bottom: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  :root { scroll-behavior: auto; }
+  :root[data-smooth] { scroll-behavior: auto; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .js [data-reveal] { opacity: 1; transform: none; filter: none; }
 }

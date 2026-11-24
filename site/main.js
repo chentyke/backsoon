@@ -1,5 +1,5 @@
 // BackSoon landing page: the panel's own motion system, driven by a scripted demo.
-import { CATALOGS, LOCALES, NAMES, PANEL, negotiate } from './i18n.js';
+import { CATALOGS, LOCALES, NAMES, PANEL, negotiate } from './i18n.js?v=2';
 document.documentElement.classList.add('js');
 
 // motion: springs sampled into css linear() so waapi and transitions share one curve
@@ -764,14 +764,27 @@ const DOCS = {
 };
 
 // apply a language to everything on the page
-const picker = document.querySelector('#language');
-picker.append(...LOCALES.map(code => { const o = h('option', null, NAMES[code]); o.value = code; o.lang = code; return o; }));
+const picker = document.querySelector('.picker');
+const pickerButton = picker.querySelector('.picker-button');
+const pickerValue = picker.querySelector('.picker-value');
+const menu = picker.querySelector('.picker-menu');
+const hilite = menu.querySelector('.picker-hilite');
+const options = LOCALES.map(code => {
+  const option = h('div', 'picker-option');
+  option.id = 'language-' + code;
+  option.lang = code;
+  option.setAttribute('role', 'option');
+  option.innerHTML = '<svg class="picker-check" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.4 6.6 11.5 12.5 4.8"/></svg>';
+  option.append(h('span', null, NAMES[code]));
+  return option;
+});
+menu.append(...options);
 function applyLanguage(animate) {
   T = CATALOGS[locale];
   document.documentElement.lang = locale;
   document.title = t('title');
   document.querySelector('meta[name=description]').content = t('description');
-  picker.value = locale;
+  showLanguage(animate);
   for (const el of document.querySelectorAll('[data-i18n]')) {
     const text = t(el.dataset.i18n);
     if (animate && el.getBoundingClientRect().bottom > 0 && el.getBoundingClientRect().top < innerHeight) swapText(el, text);
@@ -793,14 +806,120 @@ function applyLanguage(animate) {
   if (versusPlaying) playVersus(); else playVersus(true);
   if (!versusPlaying) showMinute(14, false);
 }
-picker.addEventListener('change', () => {
-  locale = picker.value;
+// The language menu: the pill springs open into a list on the panel's own
+// curves, and works like a listbox from the keyboard.
+const MENU_GAP = 8;
+let menuOpen = false, active = -1;
+document.documentElement.style.setProperty('--menu-ease', REORDER.easing);
+document.documentElement.style.setProperty('--menu-dur', REORDER.duration + 'ms');
+
+function showLanguage(animate) {
+  const before = pickerButton.offsetWidth;
+  swapText(pickerValue, NAMES[locale], animate);
+  pickerValue.lang = locale;
+  options.forEach((option, i) => option.setAttribute('aria-selected', String(LOCALES[i] === locale)));
+  const after = pickerButton.offsetWidth;
+  if (animate && !still() && before && before !== after)
+    pickerButton.animate([{ width: before + 'px' }, { width: after + 'px' }], REORDER);
+}
+
+// One highlight slides between rows instead of each row lighting up alone.
+function highlight(index) {
+  active = index;
+  const option = options[index];
+  menu.setAttribute('aria-activedescendant', option.id);
+  options.forEach(o => o.toggleAttribute('data-active', o === option));
+  const place = () => {
+    hilite.style.height = option.offsetHeight + 'px';
+    hilite.style.transform = `translateY(${option.offsetTop}px)`;
+  };
+  if (hilite.style.opacity === '1') return place();
+  hilite.style.transition = 'opacity .15s';
+  place();
+  hilite.offsetWidth;
+  hilite.style.transition = '';
+  hilite.style.opacity = '1';
+}
+
+function openMenu() {
+  if (menuOpen) return;
+  menuOpen = true;
+  menu.hidden = false;
+  picker.toggleAttribute('data-open', true);
+  pickerButton.setAttribute('aria-expanded', 'true');
+  hilite.style.opacity = '0';
+  highlight(LOCALES.indexOf(locale));
+  menu.focus({ preventScroll: true });
+  if (still()) return;
+  for (const el of [menu, ...options]) el.getAnimations().forEach(a => a.cancel());
+  menu.animate([{ opacity: 0, transform: `translateY(${-MENU_GAP}px) scale(.9)` }, { opacity: 1, transform: 'none' }], OPEN);
+  options.forEach((option, i) => option.animate([{ opacity: 0, transform: 'translateY(-6px)' }, { opacity: 1, transform: 'none' }],
+    { duration: 320, delay: 30 + i * 24, easing: EASE_OUT, fill: 'backwards' }));
+}
+
+async function closeMenu(refocus = true) {
+  if (!menuOpen) return;
+  menuOpen = false;
+  picker.toggleAttribute('data-open', false);
+  pickerButton.setAttribute('aria-expanded', 'false');
+  menu.removeAttribute('aria-activedescendant');
+  if (refocus) pickerButton.focus({ preventScroll: true });
+  if (!still()) {
+    options.forEach(option => option.getAnimations().forEach(a => a.cancel()));
+    menu.getAnimations().forEach(a => a.cancel());
+    await menu.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: `translateY(${-MENU_GAP / 2}px) scale(.96)` }],
+      { ...CLOSE, fill: 'forwards' }).finished.catch(() => {});
+  }
+  // reopened while it was closing: leave it open
+  if (menuOpen) return;
+  menu.hidden = true;
+  menu.getAnimations().forEach(a => a.cancel());
+}
+
+function choose(index) {
+  closeMenu();
+  if (LOCALES[index] === locale) return;
+  locale = LOCALES[index];
   store.set(locale);
   const url = new URL(location.href);
   url.searchParams.set('lang', locale);
   history.replaceState(null, '', url);
   applyLanguage(true);
+}
+
+pickerButton.addEventListener('click', () => menuOpen ? closeMenu() : openMenu());
+pickerButton.addEventListener('keydown', e => {
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  e.preventDefault();
+  openMenu();
 });
+menu.addEventListener('keydown', e => {
+  const last = options.length - 1;
+  const keys = {
+    ArrowDown: () => highlight(active < last ? active + 1 : 0),
+    ArrowUp: () => highlight(active > 0 ? active - 1 : last),
+    Home: () => highlight(0),
+    End: () => highlight(last),
+    Enter: () => choose(active),
+    ' ': () => choose(active),
+    Escape: () => closeMenu(),
+  };
+  if (e.key === 'Tab') return void closeMenu(false);
+  const typed = e.key.length === 1 && e.key !== ' ' ?
+    options.findIndex(o => o.textContent.toLowerCase().startsWith(e.key.toLowerCase())) : -1;
+  if (typed >= 0) highlight(typed);
+  else if (keys[e.key]) keys[e.key]();
+  else return;
+  e.preventDefault();
+  e.stopPropagation();
+});
+options.forEach((option, i) => {
+  option.addEventListener('pointermove', () => { if (active !== i) highlight(i); });
+  option.addEventListener('click', () => choose(i));
+});
+menu.addEventListener('pointerleave', () => { if (menuOpen) highlight(LOCALES.indexOf(locale)); });
+document.addEventListener('pointerdown', e => { if (menuOpen && !picker.contains(e.target)) closeMenu(false); });
+picker.addEventListener('focusout', e => { if (menuOpen && !picker.contains(e.relatedTarget)) closeMenu(false); });
 
 // first paint
 applyLanguage(false);
@@ -836,6 +955,10 @@ const reveal = new IntersectionObserver(entries => {
   }
 }, { rootMargin: '0px 0px -8% 0px' });
 document.querySelectorAll('[data-reveal]').forEach(el => reveal.observe(el));
+// in-page links glide, but only after the browser has put a reloaded page
+// back where it was
+const smooth = () => requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.toggleAttribute('data-smooth', true)));
+if (document.readyState === 'complete') smooth(); else addEventListener('load', smooth, { once: true });
 const nav = document.querySelector('.nav');
 const onScroll = () => nav.toggleAttribute('data-scrolled', scrollY > 8);
 addEventListener('scroll', onScroll, { passive: true });
