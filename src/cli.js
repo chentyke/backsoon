@@ -253,7 +253,7 @@ async function register(action, v, p, argv, rules) {
     worker_start: identity(process.pid),
     ...extra,
   };
-  const canNotify = await checkNoticeAccess(task);
+  const noticeWarning = await checkNoticeAccess(task);
   const root = home();
   const startedId = await startWorker(root, task, v['after-success']);
   console.log(startedId);
@@ -261,7 +261,7 @@ async function register(action, v, p, argv, rules) {
     console.error(msg('followUpExists', { id: startedId }));
     return;
   }
-  if (!canNotify) console.error(msg('noticePermission', { id }));
+  if (noticeWarning) console.error(msg(noticeWarning, { id }));
   const desktop = process.env.CODEX_APP_TOOLS_PIPE_PATH;
   try {
     if (desktop && !v['no-panel']) {
@@ -277,7 +277,7 @@ async function register(action, v, p, argv, rules) {
     console.error(msg('handoffNoticeIssue', { id, detail: notice.detail || msg('deliveryUnknown') }));
     return;
   }
-  if (canNotify && desktop && ['resume', 'steer'].includes(notify) && destination === process.env.CODEX_THREAD_ID)
+  if (noticeWarning !== 'noticePermission' && desktop && ['resume', 'steer'].includes(notify) && destination === process.env.CODEX_THREAD_ID)
     console.error(
       msg('handoff'),
     );
