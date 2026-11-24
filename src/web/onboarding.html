@@ -15,13 +15,14 @@
       <source media="(prefers-color-scheme: dark)" srcset="/brand/logo-dark.svg">
       <img src="/brand/logo.svg" width="122" height="26" alt="BackSoon">
     </picture>
-    <label class="picker"><select id="language" aria-label="Language" data-label="language">
-      <option value="en" lang="en">English</option>
-      <option value="zh-CN" lang="zh-CN">简体中文</option>
-      <option value="zh-TW" lang="zh-Hant">繁體中文</option>
-      <option value="ja" lang="ja">日本語</option>
-      <option value="ko" lang="ko">한국어</option>
-    </select></label>
+    <div class="picker">
+      <button class="picker-button" type="button" id="language" aria-haspopup="listbox" aria-expanded="false" aria-controls="language-menu">
+        <span class="sr-only" data-msg="language">Language</span>
+        <span class="picker-value">English</span>
+        <svg class="picker-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5 8 10l3.5-3.5"/></svg>
+      </button>
+      <div class="picker-menu" id="language-menu" role="listbox" tabindex="-1" aria-label="Language" data-label="language" hidden><span class="picker-hilite" aria-hidden="true"></span></div>
+    </div>
   </div></header>
   <main class="guide">
     <article class="setup" id="setup" data-tone="blue" aria-busy="true">
