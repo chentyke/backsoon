@@ -234,14 +234,18 @@ test('setup guide adds the recommended rule only after confirmation, and can ski
   }
 });
 
-test('a queued notification that could not resume the chat is visible beside a successful result', async ({ page }) => {
+test('a queued notification shows the resume warning only inside task details', async ({ page }) => {
   const task = { id:'done', name:'Build', status:'succeeded', code:0, started:100, ended:110, argv:['make'],
-    notice:{state:'wake_warning', issues:1} };
+    notice:{state:'queued', issues:0, detail:'Warning: could not resume thread'} };
   await page.route('**/api/tasks', route => route.fulfill({json:[task]}));
   await page.route('**/api/logs/done', route => route.fulfill({json:['Built successfully']}));
   await page.goto(new URL('/', url).href);
   await page.getByRole('button', {name:/Build/}).click();
   const dialog = page.getByRole('dialog');
-  await expect(dialog.locator('.hint')).toContainText(catalogs.en.wakeWarning);
+  await expect(dialog.locator('.hint')).toHaveText(catalogs.en.queued);
+  const warning = dialog.getByText(task.notice.detail, {exact:true});
+  await expect(warning).toBeHidden();
+  await dialog.locator('#metadata summary').click();
+  await expect(warning).toBeVisible();
   await expect(dialog.locator('.dialog-head .status')).toHaveText(catalogs.en.succeeded);
 });

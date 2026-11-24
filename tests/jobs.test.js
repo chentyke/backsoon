@@ -43,7 +43,7 @@ test('notification modes and delivery errors remain separate from the command re
   const h = sandbox(t);
   for (const [mode, rc, reply, expected] of [
     ['queue', '0', '', 'queued'],
-    ['resume', '0', 'Warning: message was queued, but could not resume thread', 'wake_warning'],
+    ['resume', '0', 'Warning: message was queued, but could not resume thread', 'queued'],
     ['resume', '1', 'unavailable', 'failed'],
     ['off', '0', '', null],
   ]) {

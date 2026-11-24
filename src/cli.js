@@ -273,7 +273,7 @@ async function register(action, v, p, argv, rules) {
     return;
   }
   const notice = desktop && optional(path.join(root, id, 'notice.json'));
-  if (notice && ['failed', 'unknown', 'wake_warning'].includes(notice.state)) {
+  if (notice && ['failed', 'unknown'].includes(notice.state)) {
     console.error(msg('handoffNoticeIssue', { id, detail: notice.detail || msg('deliveryUnknown') }));
     return;
   }
@@ -385,8 +385,7 @@ export async function main([action, ...args]) {
   else if (action === 'logs') console.log(tail(dir).join('\n'));
   else if (action === 'retry-notice') {
     const notice = await retryNotice(dir, task);
-    if (notice.state === 'wake_warning') console.error(msg('wakeWarning') + '\n' + notice.detail);
-    else if (['queued', 'steered', 'received'].includes(notice.state)) console.log(msg(notice.state));
+    if (['queued', 'steered', 'received'].includes(notice.state)) console.log(msg(notice.state));
     else throw Error(notice.detail);
   } else if (action === 'resolve') {
     const reason = v.reason?.trim();
