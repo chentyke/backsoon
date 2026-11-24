@@ -1,10 +1,12 @@
 import { catalogs } from './web/i18n.js';
+import { setupStatus } from './onboarding.js';
 import { msg } from './locale.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import http from 'node:http';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
+import crypto, { createHash } from 'node:crypto';
+import { setRules } from './setup.js';
 import { once } from 'node:events';
 import {
   home,
@@ -59,11 +61,12 @@ function tasks(chat) {
   return result.sort((a, b) => b.started - a.started);
 }
 export const panelModules = [
-  'app', 'glyphs', 'i18n', 'language', 'motion', 'task-list', 'task-view', 'task-window', 'window-motion',
+  'app', 'onboarding', 'celebrate', 'glyphs', 'i18n', 'language', 'motion', 'task-list', 'task-view', 'task-window', 'window-motion',
   ...Object.keys(catalogs),
 ];
 const assets = new Map([
   ['/', ['index.html', 'text/html']],
+  ['/setup', ['onboarding.html', 'text/html']],
   ...panelModules.map((name) => ['/' + name + '.js', [name + '.js', 'text/javascript']]),
   ['/task.js', ['../task.js', 'text/javascript']],
   ['/style.css', ['style.css', 'text/css']],
@@ -72,12 +75,60 @@ const assets = new Map([
     ['../../brand/' + name + '.svg', 'image/svg+xml'],
   ]),
 ]);
-function handle(req, res) {
+function readBody(req, limit = 1024) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.setEncoding('utf8');
+    req.on('data', chunk => {
+      body += chunk;
+      if (body.length > limit) reject(Error('Request too large'));
+    });
+    req.on('end', () => resolve(body));
+    req.on('error', reject);
+  });
+}
+function sendJson(res, code, data) {
+  const body = Buffer.from(JSON.stringify(data));
+  res.writeHead(code, {
+    'Content-Type': 'application/json; charset=utf-8', 'Content-Length': body.length,
+    'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
+  }).end(body);
+}
+// The guide's only write: add or remove the BackSoon block in AGENTS.md.
+// A page on another site cannot reach it: the Host and Origin must be this
+// server, the JSON body and custom headers force a CORS preflight that is
+// never answered, and the token only exists in the guide's own URL fragment.
+async function changeRules(req, res, token, readStatus) {
+  const self = ['http://127.0.0.1:' + req.socket.localPort, 'http://localhost:' + req.socket.localPort];
+  const sent = String(req.headers['x-backsoon-token'] || '');
+  if (!self.includes(req.headers.origin) || req.headers['x-backsoon-guide'] !== '1' ||
+      !/^application\/json\b/.test(req.headers['content-type'] || '') ||
+      sent.length !== token.length || !crypto.timingSafeEqual(Buffer.from(sent), Buffer.from(token)))
+    return res.writeHead(403).end();
+  let enabled, locale;
+  try {
+    ({ enabled, locale } = JSON.parse(await readBody(req)));
+  } catch {
+    return res.writeHead(400).end();
+  }
+  if (typeof enabled !== 'boolean' || !Object.hasOwn(catalogs, locale)) return res.writeHead(400).end();
+  try {
+    await setRules(enabled, undefined, locale);
+  } catch (error) {
+    return sendJson(res, 409, { error: error.message });
+  }
+  sendJson(res, 200, await readStatus(true));
+}
+async function handle(req, res, onboarding, readStatus, token) {
   const host = req.headers.host,
     port = req.socket.localPort;
   if (host !== '127.0.0.1:' + port && host !== 'localhost:' + port) {
     res.writeHead(403).end();
     return;
+  }
+  if (onboarding && req.url === '/api/rules') {
+    if (req.method !== 'POST') return res.writeHead(405, { Allow: 'POST' }).end();
+    return changeRules(req, res, token, readStatus).catch(() => res.writeHead(500).end());
   }
   if (req.method !== 'GET') {
     res.writeHead(405).end();
@@ -89,6 +140,8 @@ function handle(req, res) {
     const job = /^\/(api\/)?tasks\/([a-f0-9]{12})$/.exec(route);
     const logs = /^\/api\/logs\/([a-f0-9]{12})$/.exec(route);
     const asset = assets.get((chat && !chat[1]) || (job && !job[1]) ? '/' : route);
+    if (onboarding && !asset && route !== '/api/setup') return res.writeHead(404).end();
+    if (!onboarding && route === '/setup') return res.writeHead(404).end();
     let body, type;
     if (asset) {
       type = asset[1];
@@ -96,7 +149,10 @@ function handle(req, res) {
     } else {
       type = 'application/json';
       let data;
-      if (route === '/api/tasks' || chat) data = tasks(chat?.[2]);
+      if (onboarding && route === '/api/setup') {
+        if (req.headers['x-backsoon-guide'] !== '1') return res.writeHead(403).end();
+        data = await readStatus();
+      } else if (route === '/api/tasks' || chat) data = tasks(chat?.[2]);
       else if (job) data = [status(find(job[2]))];
       else if (logs) data = tail(find(logs[1]));
       else {
@@ -124,8 +180,18 @@ function running() {
   const panel = optional(panelFile());
   return panel?.started && identity(panel.pid) === panel.started ? panel.url : null;
 }
-export async function serve(port) {
-  const server = http.createServer(handle);
+export async function serve(port, { onboarding = false } = {}) {
+  let idle, pending;
+  // After a write, wait for any check already in flight, then read afresh.
+  const readStatus = async (fresh = false) => {
+    if (fresh) await pending?.catch(() => {});
+    return pending ??= setupStatus().finally(() => { pending = null; });
+  };
+  const token = crypto.randomBytes(16).toString('hex');
+  const server = http.createServer((req, res) => {
+    idle?.refresh();
+    void handle(req, res, onboarding, readStatus, token);
+  });
   server.listen(port, '127.0.0.1');
   try {
     await once(server, 'listening');
@@ -133,7 +199,11 @@ export async function serve(port) {
     if (e.code !== 'EADDRINUSE') throw e;
     throw Error(msg('portBusy', { port }));
   }
-  const url = 'http://127.0.0.1:' + port + '/';
+  const url = 'http://127.0.0.1:' + server.address().port + '/';
+  if (onboarding) {
+    idle = setTimeout(() => server.close(), 30 * 60 * 1000);
+    return url + 'setup#' + token;
+  }
   try {
     save(panelFile(), { pid: process.pid, started: identity(process.pid), url });
   } catch (e) {

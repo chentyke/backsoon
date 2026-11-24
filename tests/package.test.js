@@ -7,53 +7,81 @@ import fs from 'node:fs';
 import http from 'node:http';
 import { once } from 'node:events';
 import path from 'node:path';
-import { Readable } from 'node:stream';
-import { setup } from '../src/setup.js';
+import { rulesInstalled, setRules, setup } from '../src/setup.js';
 import { entry } from '../src/store.js';
 import { exec, sandbox, until, port } from './helpers.js';
 
-test('unattended setup installs the skill and requires explicit consent for the global rule', async t => {
+test('setup installs the skill and hooks, adds the AGENTS.md rule only when asked, and skill-only skips both', async t => {
   const h = sandbox(t), codexHome = path.join(h.dir, 'codex-profile');
-  const output = { write() {} };
-  const options = { userHome: h.dir, codexHome, input: Readable.from([]), output };
+  const options = { userHome: h.dir, codexHome, output: { write() {} } };
   const file = path.join(codexHome, 'AGENTS.md');
   const link = path.join(h.dir, '.agents/skills/backsoon');
-  await setup(options);
+  await setup({ ...options, skillOnly: true });
   assert.ok(fs.existsSync(path.join(link, 'SKILL.md')));
+  assert.equal(fs.existsSync(codexHome), false);
+  assert.deepEqual(await setup(options), { rules: false });
+  assert.ok(fs.existsSync(path.join(codexHome, 'hooks.json')));
   assert.equal(fs.existsSync(file), false);
-  await Promise.all([setup({ ...options, yes: true }), setup({ ...options, yes: true })]);
+  await Promise.all([setup({ ...options, rules: true }), setup({ ...options, rules: true })]);
   const rules = fs.readFileSync(file, 'utf8');
   assert.match(rules, /backsoon attach PID/);
+  assert.match(rules, /--after-success BUILD_ID/);
   assert.equal(rules.split('<!-- BackSoon: start -->').length, 2);
+  assert.deepEqual(await setup(options), { rules: true });
+  assert.equal(fs.readFileSync(file, 'utf8'), rules);
   fs.unlinkSync(link);
   fs.mkdirSync(link);
   await assert.rejects(setup(options), { message: msg('skillConflict', { link }) });
   assert.equal(fs.readFileSync(file, 'utf8'), rules);
 });
 
-test('interactive setup preserves existing rules, including line endings, and prompts only before adding', async t => {
+test('removing the rule restores the file it was added to', async t => {
+  const h = sandbox(t), codexHome = path.join(h.dir, '.codex');
+  const file = path.join(codexHome, 'AGENTS.md');
+  for (const original of ['', '# My rules\n', '# My rules\r\n']) {
+    fs.mkdirSync(codexHome, { recursive: true });
+    fs.writeFileSync(file, original);
+    assert.deepEqual(await setRules(true, codexHome), { present: true, changed: true });
+    assert.match(fs.readFileSync(file, 'utf8'), /BackSoon: start/);
+    assert.deepEqual(await setRules(false, codexHome), { present: false, changed: true });
+    assert.equal(fs.readFileSync(file, 'utf8'), original, JSON.stringify(original));
+    assert.deepEqual(await setRules(false, codexHome), { present: false, changed: false });
+  }
+  // A rule added in one language stays in that language when setup refreshes it.
+  fs.writeFileSync(file, '');
+  await setRules(true, codexHome, 'ja');
+  const japanese = fs.readFileSync(file, 'utf8');
+  assert.ok(japanese.includes(catalogs.ja.agentsRuleStart));
+  assert.ok(rulesInstalled(codexHome));
+  await setup({ userHome: h.dir, codexHome, locale: 'en', output: { write() {} } });
+  assert.equal(fs.readFileSync(file, 'utf8'), japanese);
+  const around = '# Mine\n\n<!-- BackSoon: start -->\nOld\n<!-- BackSoon: end -->\n\n## Later\n';
+  fs.writeFileSync(file, around);
+  await setRules(false, codexHome);
+  assert.equal(fs.readFileSync(file, 'utf8'), '# Mine\n\n## Later\n');
+});
+
+test('rerunning setup replaces only its block, preserves CRLF and leaves malformed markers intact', async t => {
   const h = sandbox(t), codexHome = path.join(h.dir, '.codex');
   fs.mkdirSync(codexHome);
-  const file = path.join(codexHome, 'AGENTS.md'), previous = '# Project rules\r\nKeep this sentence.';
-  fs.writeFileSync(file, previous);
-  async function run(answer) {
-    let transcript = '';
-    const input = Readable.from([answer]);
-    input.isTTY = true;
-    await setup({ userHome: h.dir, codexHome, input, output: { isTTY: true, write(s) { transcript += s; } } });
-    return transcript;
+  const options = { userHome: h.dir, codexHome, output: { write() {} } };
+  const file = path.join(codexHome, 'AGENTS.md');
+  const prefix = '# My rules\r\n', suffix = '\r\n## Local rules\nUntouched';
+  const old = prefix + '<!-- BackSoon: start -->\r\nOld rules\r\n<!-- BackSoon: end -->' + suffix;
+  fs.writeFileSync(file, old);
+  await setup({ ...options, skillOnly: true });
+  assert.equal(fs.readFileSync(file, 'utf8'), old);
+  await setup(options);
+  const result = fs.readFileSync(file, 'utf8');
+  assert.ok(result.startsWith(prefix) && result.endsWith(suffix));
+  assert.doesNotMatch(result.slice(0, -suffix.length), /(?<!\r)\n|Old rules/);
+  await setup(options);
+  assert.equal(fs.readFileSync(file, 'utf8'), result);
+  for (const broken of ['<!-- BackSoon: start -->', '<!-- BackSoon: end -->', old + '\n' + old]) {
+    fs.writeFileSync(file, broken);
+    await assert.rejects(setup(options), { message: msg('setupMarkers') });
+    assert.equal(fs.readFileSync(file, 'utf8'), broken);
   }
-  for (const decline of ['n\n', '\n']) {
-    assert.match(await run(decline), /\[y\/N\]/);
-    assert.equal(fs.readFileSync(file, 'utf8'), previous);
-  }
-  assert.match(await run('Y\n'), /\[y\/N\]/);
-  const applied = fs.readFileSync(file, 'utf8');
-  assert.ok(applied.startsWith(previous + '\r\n\r\n'));
-  assert.doesNotMatch(applied, /(?<!\r)\n/);
-  assert.match(applied, /backsoon start/);
-  assert.doesNotMatch(await run('\n'), /\[y\/N\]/);
-  assert.equal(fs.readFileSync(file, 'utf8'), applied);
 });
 
 test('install the packed npm archive and run it outside the checkout', async (t) => {
@@ -83,6 +111,7 @@ test('install the packed npm archive and run it outside the checkout', async (t)
   const scripts = panelModules.map(name => 'src/web/' + name + '.js');
   for (const file of scripts) assert.ok(names.includes(file), file);
   assert.ok(names.includes('src/web/index.html'));
+  assert.ok(names.includes('src/web/onboarding.html'));
   assert.ok(
     names.every(
       (f) =>
@@ -90,7 +119,7 @@ test('install the packed npm archive and run it outside the checkout', async (t)
         Object.keys(catalogs).some((locale) => f === 'README.' + locale + '.md') ||
         brandFiles.includes(f) || scripts.includes(f) ||
         /^src\/[\w-]+\.js$/.test(f) ||
-        /^src\/web\/(index\.html|style\.css)$/.test(f),
+        /^src\/web\/((?:index|onboarding)\.html|style\.css)$/.test(f),
     ),
   );
   const archive = fs.readFileSync(path.join(h.dir, packed.filename));
@@ -128,7 +157,7 @@ test('install the packed npm archive and run it outside the checkout', async (t)
   const run = (...args) =>
     exec(installed, args, { cwd: h.dir, env, timeout: 10000 }).then((v) => v.stdout.trim());
   assert.equal(await run('--version'), packed.version);
-  assert.match(await run('setup', '--help'), /--yes/);
+  assert.match(await run('setup', '--help'), /--skill-only/);
   await until(async () => JSON.parse(await run('show', id)).status === 'succeeded');
   assert.equal(await run('logs', id), '完成');
   env.BACKSOON_PORT = String(await port());
@@ -149,4 +178,22 @@ test('install the packed npm archive and run it outside the checkout', async (t)
   assert.equal(fs.readFileSync(path.join(h.dir, '.backsoon/.gitignore'), 'utf8'), '*\n');
   const result = await npx('show', id);
   assert.equal(JSON.parse(result.stdout).code, 0);
+});
+
+test('unattended setup leaves AGENTS.md alone unless --rules is given', async t => {
+  const h = sandbox(t);
+  h.env.HOME = h.dir;
+  h.env.CODEX_HOME = path.join(h.dir, 'profile');
+  const file = path.join(h.env.CODEX_HOME, 'AGENTS.md');
+  const first = await exec(entry, ['setup'], {env:h.env, cwd:h.dir});
+  assert.doesNotMatch(first.stderr, /http:\/\//);
+  assert.match(first.stdout, /backsoon setup --rules/);
+  assert.equal(fs.existsSync(file), false);
+  h.env.CODEX_APP_TOOLS_PIPE_PATH = 'desktop';
+  const again = await exec(entry, ['setup', '--no-open', '--rules'], {env:h.env, cwd:h.dir});
+  assert.doesNotMatch(again.stderr, /open_in_codex/);
+  assert.match(fs.readFileSync(file, 'utf8'), /backsoon start/);
+  await assert.rejects(exec(entry, ['setup', '--rules', '--no-rules'], {env:h.env, cwd:h.dir}));
+  await exec(entry, ['setup', '--no-open', '--no-rules'], {env:h.env, cwd:h.dir});
+  assert.equal(fs.readFileSync(file, 'utf8'), '');
 });

@@ -28,7 +28,7 @@ backsoon setup
 npm i -g https://backsoon.dev/backsoon.tgz && backsoon setup
 ```
 
-安装时输入 `y`，即可将耗时任务规则添加到 `~/.codex/AGENTS.md`。如果设置了 `CODEX_HOME`，规则会写到该目录。直接回车只安装技能。在没有交互提示的终端里，用 `backsoon setup --yes` 同时安装技能并添加规则。卸载时可删除文件中由 BackSoon 注释标出的整段内容。
+setup 会安装技能，并在 `hooks.json` 注册任务完成通知。`~/.codex/AGENTS.md`（设置了 `CODEX_HOME` 时为该目录）中的 BackSoon 规则是推荐项而非必选：加入后，Codex 会主动把耗时命令交给 BackSoon。安装引导会先展示规则内容，你确认后才写入；没有浏览器时 setup 会在终端询问，非交互安装不会修改这个文件。用 `--rules` 加入规则，用 `--no-rules` 移除。加入后重复运行 setup 会保持规则为最新，并保留文件中的其他内容。只安装技能用 `backsoon setup --skill-only`。然后信任名为“BackSoon completion notices”的四个 hook：在 Codex 桌面版打开 **设置 › 钩子**，逐一点按 **信任**；如果只有 BackSoon 需要审核，可点按 **全部信任**。在 Codex 命令行输入 `/hooks`，在事件列表按 `t` 可一次信任全部四项。如果还有其他待审核的 hook，请逐一审核。
 
 第一行安装命令和面板。第二行让 Codex 在其他项目中也能找到 Skill，只需执行一次。更新时重新运行安装命令即可。要卸载，先删除 setup 创建的符号链接 `~/.agents/skills/backsoon`，再运行 `npm uninstall -g backsoon`。
 

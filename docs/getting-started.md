@@ -26,11 +26,11 @@ To install directly from backsoon.dev, use the same setup command after installi
 npm i -g https://backsoon.dev/backsoon.tgz && backsoon setup
 ```
 
-During setup, enter `y` to add the BackSoon rule to `~/.codex/AGENTS.md` (or `$CODEX_HOME/AGENTS.md`). Press Enter to install only the skill. For unattended installation with the rule, run `backsoon setup --yes`. To remove the rule, delete the block between the BackSoon comments, including the comments.
+Setup installs the skill and registers completion handlers in `hooks.json`. A BackSoon section in `~/.codex/AGENTS.md` (or `$CODEX_HOME/AGENTS.md`) is recommended but optional: with it, Codex hands long commands to BackSoon on its own. The setup guide shows the section and adds it only when you confirm. Without a browser, setup asks in the terminal, and unattended installs leave the file alone. Pass `--rules` to add the section or `--no-rules` to remove it. Once added, rerunning setup keeps it current and preserves the rest of the file. Then trust the four “BackSoon completion notices” hooks. In the Codex app, open **Settings › Hooks** and select **Trust** on each, or **Trust all** if only BackSoon needs review. In the Codex CLI, enter `/hooks` and press `t` on the event list to trust all four at once. If other hooks are pending, review them individually. Run `backsoon setup --skill-only` to install just the skill.
 
 The first command installs the CLI and panel. The second makes the skill available to Codex for this user. Check that your Codex CLI supports `codex queue --resume` with `codex queue --help`. Then open a new chat and ask “Use BackSoon to run `sleep 3` and tell me when it finishes.”
 
-Run the install command again to update. To uninstall, remove the skill link created by setup at `~/.agents/skills/backsoon`, then run `npm uninstall -g backsoon`.
+Run the install command again to update. To uninstall, first remove the four “BackSoon completion notices” commands from your Codex `hooks.json`, remove the skill link created by setup at `~/.agents/skills/backsoon`, then run `npm uninstall -g backsoon`.
 
 ## Language
 

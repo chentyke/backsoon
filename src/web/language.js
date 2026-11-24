@@ -16,7 +16,8 @@ function translatePanel() {
   document.documentElement.lang = locale;
   picker.value = locale;
   translate(document);
-  translate(document.querySelector('#task').content);
+  const template = document.querySelector('#task');
+  if (template) translate(template.content);
 }
 
 export function bindLanguage(onChange) {

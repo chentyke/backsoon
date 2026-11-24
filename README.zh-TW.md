@@ -13,6 +13,8 @@ npm i -g backsoon
 backsoon setup
 ```
 
+setup 會安裝技能並註冊任務完成通知。安裝指南會在 Codex 側邊面板或系統瀏覽器開啟，引導你授權完成通知，並推薦在全域 `AGENTS.md` 加入一條 BackSoon 規則；你可以加入、略過，之後也能移除。沒有瀏覽器時，setup 會在終端機詢問。使用 `--rules` 或 `--no-rules` 預先決定，使用 `--no-open` 跳過指南，或用 `--skill-only` 只安裝技能。
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/session-dark.zh-TW.png">
   <img alt="同一個 Codex 工作階段：不用 BackSoon 時，Codex 輪詢 14 分鐘的編譯，日誌塞滿上下文；使用 BackSoon 時這一輪立刻結束，等待不耗 token，只有一行結果回到聊天" src="docs/images/session-light.zh-TW.png">

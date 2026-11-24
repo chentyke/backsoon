@@ -2,12 +2,13 @@ import { formatCommand, isActive, taskState } from './task.js';
 import { msg } from './locale.js';
 import fs from 'node:fs';
 import { observe, processDetails } from './attach.js';
-import { setup } from './setup.js';
+import { rulesPath, setRules, setup, shortPath } from './setup.js';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { parseArgs } from 'node:util';
 import {
   read,
+  optional,
   save,
   folder,
   status,
@@ -22,6 +23,7 @@ import {
   withFileLock,
 } from './store.js';
 import { registerRoot, launch, serve } from './dashboard.js';
+import { guideAvailable, openSetupGuide, printDesktopLink } from './onboarding.js';
 import { chatLabel } from './chat.js';
 import { checkNoticeAccess, retryNotice } from './notify.js';
 import { scriptPath } from './progress.js';
@@ -55,8 +57,8 @@ const progress = {
   'progress-interval': 'string',
 };
 const schema = {
-  setup: { yes: 'boolean' },
-  start: { ...common, ...progress, 'alert-on': 'string' },
+  setup: { rules: 'boolean', 'no-rules': 'boolean', 'skill-only': 'boolean', 'no-open': 'boolean' },
+  start: { ...common, ...progress, 'alert-on': 'string', 'after-success': 'string' },
   attach: { ...common, ...progress },
   'wait-chat': { ...common, 'after-task': 'string', 'final-line': 'string', timeout: 'string' },
   resolve: { reason: 'string' },
@@ -145,9 +147,37 @@ function positive(value, label) {
   if (!Number.isFinite(n) || n <= 0) throw Error(msg('positiveSeconds', { label }));
   return n;
 }
+async function startWorker(root, task, parentId) {
+  const dir = path.join(root, task.id);
+  async function start(reservation) {
+    fs.mkdirSync(dir, { mode: 0o700 });
+    save(path.join(dir, 'task.json'), task);
+    // Reserve before spawning: losing the CLI after launch must never run the installation twice.
+    if (reservation) save(reservation, { id: task.id });
+    await detached(['_run', dir]);
+    return task.id;
+  }
+  if (parentId === undefined) return start();
+  const parent = folder(parentId, root);
+  return withFileLock(path.join(parent, 'follow-up.lock'), async () => {
+    const build = read(path.join(parent, 'task.json'));
+    if (build.status !== 'succeeded' || !build.ended) throw Error(msg('followUpNeedsSuccess'));
+    const reservation = path.join(parent, 'follow-up.json');
+    const previous = optional(reservation);
+    if (previous) {
+      const saved = read(path.join(folder(previous.id, root), 'task.json'));
+      if (saved.cwd !== task.cwd || JSON.stringify(saved.argv) !== JSON.stringify(task.argv))
+        throw Error(msg('followUpConflict', { id: saved.id }));
+      return saved.id;
+    }
+    task.after_success = parentId;
+    return start(reservation);
+  });
+}
+
 async function register(action, v, p, argv, rules) {
   if (v.notify && v['no-notify']) throw Error(msg('notifyConflict'));
-  const notify = v['no-notify'] ? 'off' : (v.notify ?? 'resume');
+  const notify = v['no-notify'] ? 'off' : (v.notify ?? 'steer');
   if (!['off', 'resume', 'queue', 'steer'].includes(notify))
     throw Error(msg('badMode'));
   const thread = process.env.CODEX_THREAD_ID || v.thread || null;
@@ -224,33 +254,52 @@ async function register(action, v, p, argv, rules) {
     ...extra,
   };
   const canNotify = await checkNoticeAccess(task);
-  const root = home(),
-    dir = path.join(root, id);
-  fs.mkdirSync(dir, { mode: 0o700 });
-  save(path.join(dir, 'task.json'), task);
-  await detached(['_run', dir]);
-  console.log(id);
+  const root = home();
+  const startedId = await startWorker(root, task, v['after-success']);
+  console.log(startedId);
+  if (startedId !== id) {
+    console.error(msg('followUpExists', { id: startedId }));
+    return;
+  }
   if (!canNotify) console.error(msg('noticePermission', { id }));
   const desktop = process.env.CODEX_APP_TOOLS_PIPE_PATH;
   try {
-    if (desktop && !v['no-panel'])
-      console.error(msg('panelLink', { url: await launch(thread, thread ? null : id) }));
-    else registerRoot(root);
+    if (desktop && !v['no-panel']) {
+      const url = await launch(thread, thread ? null : id);
+      printDesktopLink(url);
+    } else registerRoot(root);
   } catch (e) {
     console.error(msg('panelLaunchError', { error: e.message }));
+    return;
+  }
+  const notice = desktop && optional(path.join(root, id, 'notice.json'));
+  if (notice && ['failed', 'unknown', 'wake_warning'].includes(notice.state)) {
+    console.error(msg('handoffNoticeIssue', { id, detail: notice.detail || msg('deliveryUnknown') }));
+    return;
   }
   if (canNotify && desktop && ['resume', 'steer'].includes(notify) && destination === process.env.CODEX_THREAD_ID)
     console.error(
       msg('handoff'),
     );
 }
+async function confirm(question) {
+  const { createInterface } = await import('node:readline/promises');
+  const prompt = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return /^(y|yes|)$/i.test((await prompt.question(question)).trim());
+  } finally {
+    prompt.close();
+  }
+}
+
 export async function main([action, ...args]) {
   const ready = (value) => {
     if (process.connected) process.send({ value }, () => {});
   };
-  if (action === '_run' || action === '_serve') {
+  if (action === '_run' || action === '_serve' || action === '_onboard') {
     try {
       if (action === '_run') await (await import('./worker.js')).run(args[0], ready);
+      else if (action === '_onboard') ready(await serve(0, { onboarding: true }));
       else ready(await serve(Number(args[0])));
     } catch (e) {
       if (process.connected) process.send({ error: e.message }, () => {});
@@ -258,9 +307,23 @@ export async function main([action, ...args]) {
     }
     return;
   }
+  if (action === '_hook') {
+    const { receive } = await import('./receiver.js');
+    let input = '';
+    for await (const chunk of process.stdin.setEncoding('utf8')) input += chunk;
+    await receive(JSON.parse(input));
+    return;
+  }
   if (action === '_observe' || action === '_watch') {
     const task = read(path.join(args[0], 'task.json'));
-    if (action === '_observe') await observe(task);
+    if (action === '_hook') {
+    const { receive } = await import('./receiver.js');
+    let input = '';
+    for await (const chunk of process.stdin.setEncoding('utf8')) input += chunk;
+    await receive(JSON.parse(input));
+    return;
+  }
+  if (action === '_observe') await observe(task);
     else {
       const { waitChat } = await import('./chat.js');
       const results = await Promise.all((task.watch.chats || [task.watch.chat]).map(chat =>
@@ -287,7 +350,20 @@ export async function main([action, ...args]) {
   if (action === 'wait-chat' ? !p.length : p.length !== expected) throw Error(usage(action));
   if (['start', 'wait-chat', 'attach'].includes(action)) return register(action, v, p, argv, rules);
   if (action === 'setup') {
-    await setup({ yes: v.yes });
+    if (v.rules && v['no-rules']) throw Error(msg('rulesConflict'));
+    const skillOnly = v['skill-only'];
+    const result = await setup({ skillOnly, rules: v.rules ? true : v['no-rules'] ? false : undefined });
+    if (skillOnly) return;
+    const guide = !v['no-open'] && guideAvailable();
+    // The rule is a recommendation: the guide offers it, a terminal asks, and
+    // an unattended install leaves AGENTS.md alone unless --rules is given.
+    if (!result.rules && !v['no-rules'] && !guide) {
+      if (process.stdin.isTTY && process.stdout.isTTY && await confirm(msg('rulesPrompt', { path: shortPath(rulesPath()) }))) {
+        await setRules(true);
+        console.log(msg('setupEnabled', { path: shortPath(rulesPath()) }));
+      } else console.log(msg('rulesSkipped'));
+    }
+    if (guide) await openSetupGuide();
     return;
   }
   if (action === 'panel') {
@@ -310,7 +386,7 @@ export async function main([action, ...args]) {
   else if (action === 'retry-notice') {
     const notice = await retryNotice(dir, task);
     if (notice.state === 'wake_warning') console.error(msg('wakeWarning') + '\n' + notice.detail);
-    else if (['queued', 'steered'].includes(notice.state)) console.log(msg(notice.state));
+    else if (['queued', 'steered', 'received'].includes(notice.state)) console.log(msg(notice.state));
     else throw Error(notice.detail);
   } else if (action === 'resolve') {
     const reason = v.reason?.trim();

@@ -29,3 +29,11 @@ export function translator(locale) {
   return (key, values = {}) =>
     (messages[key] ?? en[key]).replace(/\{(\w+)\}/g, (_, name) => String(values[name]));
 }
+
+// The optional AGENTS.md section, in the language the user chose. Commands,
+// flags and tool names stay literal in every translation.
+export function rulesLines(locale) {
+  const t = translator(locale);
+  return ['<!-- BackSoon: start -->', '## BackSoon', '', t('agentsRuleStart'), t('agentsRuleDesktop'), t('agentsRuleFollowUp'),
+    '<!-- BackSoon: end -->'];
+}
