@@ -233,3 +233,15 @@ test('setup guide adds the recommended rule only after confirmation, and can ski
     child.kill();
   }
 });
+
+test('a queued notification that could not resume the chat is visible beside a successful result', async ({ page }) => {
+  const task = { id:'done', name:'Build', status:'succeeded', code:0, started:100, ended:110, argv:['make'],
+    notice:{state:'wake_warning', issues:1} };
+  await page.route('**/api/tasks', route => route.fulfill({json:[task]}));
+  await page.route('**/api/logs/done', route => route.fulfill({json:['Built successfully']}));
+  await page.goto(new URL('/', url).href);
+  await page.getByRole('button', {name:/Build/}).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.locator('.hint')).toContainText(catalogs.en.wakeWarning);
+  await expect(dialog.locator('.dialog-head .status')).toHaveText(catalogs.en.succeeded);
+});

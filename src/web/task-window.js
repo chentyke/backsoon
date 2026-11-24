@@ -108,6 +108,7 @@ function renderHero(task, view) {
   const items = task.activities || [];
   if (view.active && task.attached_pid && !task.progress_script && !items.length &&
       !task.output_files?.length && !task.latest && !task.stage) parts.push(msg('processOnly'));
+  if (task.notice?.state === 'wake_warning') parts.push(msg('wakeWarning'));
   const needs = items.find(item => item.state === 'needsInput');
   if (needs) parts.unshift(format.activityText(needs) + ' — ' + msg('needsInput'));
   hint.textContent = parts.filter(Boolean).join(' / ');

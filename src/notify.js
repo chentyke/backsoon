@@ -1,6 +1,5 @@
 import { msg } from './locale.js';
 import { offerCompletion } from './receiver.js';
-import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -17,20 +16,23 @@ function socketPath(address) {
     'app-server-control/app-server-control.sock');
 }
 
-// Only a permission denial is actionable here. Codex can start an absent local daemon.
+function endpoint(address) {
+  return address.startsWith('unix://') ? 'ws+unix://' + socketPath(address) + ':/' : address;
+}
+
+// A handshake checks current reachability without waking or changing the chat.
 export async function checkNoticeAccess(task) {
-  const address = task.remote || 'unix://';
-  if (task.notify === 'off' || (task.notify === 'queue' && !task.remote) || !address.startsWith('unix://')) return true;
-  const socket = net.createConnection(socketPath(address));
-  socket.setTimeout(1000, () => socket.destroy());
+  if (task.notify === 'off' || (task.notify === 'queue' && !task.remote)) return null;
+  let socket;
   try {
-    return await new Promise(resolve => {
-      socket.once('connect', () => resolve(true));
-      socket.once('error', error => resolve(!['EACCES', 'EPERM'].includes(error.code)));
-      socket.once('close', () => resolve(true));
-    });
+    socket = new WebSocket(endpoint(task.remote || 'unix://'), { handshakeTimeout: 1000 });
+    await once(socket, 'open');
+    return null;
+  } catch (error) {
+    if (['EACCES', 'EPERM'].includes(error.code)) return 'noticePermission';
+    return task.notify === 'queue' ? 'queueUnavailable' : 'wakeUnavailable';
   } finally {
-    socket.destroy();
+    socket?.terminate();
   }
 }
 
@@ -38,11 +40,7 @@ export async function steer(thread, message, remote = 'unix://') {
   let socket,
     sent = false;
   try {
-    const address = remote || 'unix://';
-    const endpoint = address.startsWith('unix://')
-      ? 'ws+unix://' + socketPath(address) + ':/'
-      : address;
-    socket = new WebSocket(endpoint, { handshakeTimeout: 3000 });
+    socket = new WebSocket(endpoint(remote || 'unix://'), { handshakeTimeout: 3000 });
     const api = new Rpc((msg) => socket.send(JSON.stringify(msg)));
     socket.on('error', (e) => api.close(e));
     socket.on('close', () => api.close());
