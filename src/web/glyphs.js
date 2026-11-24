@@ -19,6 +19,8 @@ const GLYPHS = {
   interrupted: '<circle class="g-fill" cx="12" cy="12" r="10"/><path class="g-mark" d="M12.8 6.6 9 12.6h4.4l-2.4 5"/>',
   exited: ring + '<path class="g-line" d="M7.5 12h8m-3.5-3.5 3.5 3.5-3.5 3.5"/>',
   stopped: '<circle class="g-fill" cx="12" cy="12" r="10"/><rect class="g-ink" x="8.6" y="8.6" width="6.8" height="6.8" rx="1.4"/>',
+  recommended: '<circle class="g-fill" cx="12" cy="12" r="10"/><path class="g-ink" d="M12 6.6l1.45 3.95 3.95 1.45-3.95 1.45L12 17.4l-1.45-3.95L6.6 12l3.95-1.45z"/>',
+  skipped: '<circle class="g-dash" cx="12" cy="12" r="9" stroke-dasharray="2.4 3.25"/><path class="g-line" d="M8.6 12h6.8"/>',
 };
 
 export function setGlyph(box, key, animate) {

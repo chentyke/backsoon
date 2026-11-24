@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
+import { fork } from 'node:child_process';
+import { once } from 'node:events';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { entry } from '../src/store.js';
@@ -126,4 +128,108 @@ test('an open observation follows its row into Finished without inventing a resu
   await expect(row.locator('progress')).not.toHaveAttribute('value', /.+/);
   await page.keyboard.press('Escape');
   await expect(row.getByRole('button')).toBeFocused();
+});
+
+
+test('setup guide shows partial, unavailable and confirmed access and supports five languages', async ({ page }) => {
+  const child = fork(entry, ['_onboard'], { cwd: dir, env: { ...process.env, CODEX_HOME: path.join(dir, 'codex-mock') },
+    stdio: ['ignore', 'ignore', 'ignore', 'ipc'] });
+  try {
+    const [reply] = await once(child, 'message');
+    const status = { rules: true, trusted: 1, total: 4, file: '~/.codex/AGENTS.md', preview: '<!-- BackSoon: start -->' };
+    await page.route('**/api/setup', route => route.fulfill({json:status}));
+    await page.goto(reply.value);
+    for (const [locale, messages] of Object.entries(catalogs)) {
+      await page.locator('#language').selectOption(locale);
+      await expect(page).toHaveTitle(messages.guideTitle);
+      await expect(page.locator('#rules')).toHaveText(messages.guideAdded);
+      await expect(page.locator('#hooks')).toHaveText(messages.guideCount.replace('{trusted}', '1').replace('{total}', '4'));
+    }
+    await page.locator('#language').selectOption('en');
+    status.trusted = null;
+    status.rules = false;
+    await page.getByRole('button', {name:'Check again'}).click();
+    await expect(page.locator('#rules')).toHaveText(catalogs.en.guideMissing);
+    await expect(page.locator('#hooks')).toHaveText(catalogs.en.guideUnknown);
+    await expect(page.locator('#rules-fix')).toHaveAttribute('data-open', 'true');
+    await expect(page.locator('#preview-file')).toHaveText(catalogs.en.guidePreview.replace('{file}', 'AGENTS.md'));
+    await expect(page.locator('#preview-file code')).toHaveAttribute('title', '~/.codex/AGENTS.md');
+    // Trust is explained for the Codex app, naming its controls, and for the CLI.
+    await expect(page.locator('#how-desktop')).toBeVisible();
+    await expect(page.locator('#how-desktop')).toContainText(catalogs.en.guideAppTrustAll);
+    await page.getByRole('tab', { name: catalogs.en.guideTabCli }).click();
+    await expect(page.locator('#how-cli')).toContainText('/hooks');
+    await expect(page.locator('#how-desktop')).toBeHidden();
+    await page.locator('#language').selectOption('zh-TW');
+    await page.getByRole('tab', { name: catalogs['zh-TW'].guideTabDesktop }).click();
+    await expect(page.locator('#how-desktop')).toContainText(catalogs['zh-TW'].guideAppHooks);
+    await expect(page.locator('#preview')).toContainText(catalogs['zh-TW'].agentsRuleStart);
+    await page.locator('#language').selectOption('en');
+    await expect(page.locator('#overall')).toHaveText(catalogs.en.guideStateUnknown);
+    status.trusted = 4;
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect(page.locator('#hooks')).toHaveText(catalogs.en.guideReady);
+    await expect(page.locator('#how')).toBeHidden();
+    // Only the hooks are required: the optional rule stays on offer.
+    await expect(page.locator('#overall')).toHaveText(catalogs.en.guideAllSet);
+    await expect(page.locator('#lede')).toHaveText(catalogs.en.guideDoneBody);
+    await expect(page.locator('#step-rules')).toHaveAttribute('data-state', 'offer');
+    await expect(page.locator('#setup')).not.toHaveAttribute('data-complete');
+    await expect(page.locator('#setup .mark')).toBeHidden();
+    // Settling the rule leaves nothing to do: the sign is hung, with confetti
+    // that clears itself away.
+    await page.getByRole('button', { name: catalogs.en.guideSkip }).click();
+    await expect(page.locator('#setup')).toHaveAttribute('data-complete');
+    await expect(page.locator('#setup .mark')).toBeVisible();
+    await expect(page.locator('.confetti i').first()).toBeAttached();
+    await expect(page.locator('.confetti')).toHaveCount(0, { timeout: 5000 });
+    // Checking again does not celebrate a second time.
+    await page.getByRole('button', { name: 'Check again' }).click();
+    await expect(page.locator('#recheck')).toBeEnabled();
+    await expect(page.locator('.confetti')).toHaveCount(0);
+  } finally {
+    child.kill();
+  }
+});
+
+test('setup guide adds the recommended rule only after confirmation, and can skip or remove it', async ({ page }) => {
+  const codex = path.join(dir, 'codex-guide'), file = path.join(codex, 'AGENTS.md');
+  const child = fork(entry, ['_onboard'], { cwd: dir, env: { ...process.env, CODEX_HOME: codex },
+    stdio: ['ignore', 'ignore', 'ignore', 'ipc'] });
+  try {
+    const [reply] = await once(child, 'message');
+    await page.goto(reply.value);
+    await page.locator('#language').selectOption('en');
+    const rules = page.locator('#step-rules');
+    await expect(rules).toHaveAttribute('data-state', 'offer', { timeout: 15000 });
+    await expect(page.locator('#preview')).toContainText('backsoon start -- COMMAND');
+    expect(fs.existsSync(file)).toBe(false);
+
+    await page.getByRole('button', { name: catalogs.en.guideSkip }).click();
+    await expect(rules).toHaveAttribute('data-state', 'skipped');
+    await page.reload();
+    await expect(rules).toHaveAttribute('data-state', 'skipped', { timeout: 15000 });
+    expect(fs.existsSync(file)).toBe(false);
+
+    await page.getByRole('button', { name: catalogs.en.guideReconsider }).click();
+    // The rule is written in the language the page shows.
+    await page.locator('#language').selectOption('ja');
+    await page.getByRole('button', { name: catalogs.ja.guideAddRules }).click();
+    await expect(rules).toHaveAttribute('data-state', 'added');
+    await expect(page.locator('#rules')).toHaveText(catalogs.ja.guideAdded);
+    expect(fs.readFileSync(file, 'utf8')).toContain(catalogs.ja.agentsRuleFollowUp);
+    await page.locator('#language').selectOption('en');
+
+    await page.getByRole('button', { name: catalogs.en.guideRemoveRules }).click();
+    await expect(rules).toHaveAttribute('data-state', 'offer');
+    expect(fs.readFileSync(file, 'utf8')).toBe('');
+
+    // Without the token from the guide's URL, the write is refused.
+    const refused = await page.evaluate(() => fetch('/api/rules', { method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-BackSoon-Guide': '1' }, body: '{"enabled":true}' }).then(r => r.status));
+    expect(refused).toBe(403);
+    expect(fs.readFileSync(file, 'utf8')).toBe('');
+  } finally {
+    child.kill();
+  }
 });

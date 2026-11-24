@@ -7,7 +7,7 @@ import { setGlyph } from './glyphs.js';
 const dialog = document.querySelector('#task-window');
 const sheet = dialog.querySelector('.sheet');
 const groupsBox = sheet.querySelector('#activities');
-const notices = {steered: 'steered', queued: 'queued', wake_warning: 'wakeWarning', failed: 'deliveryFailed', unknown: 'deliveryUnknown'};
+const notices = {received: 'received', steered: 'steered', queued: 'queued', wake_warning: 'wakeWarning', failed: 'deliveryFailed', unknown: 'deliveryUnknown'};
 
 function renderDetails(task) {
   const box = sheet.querySelector("dl");

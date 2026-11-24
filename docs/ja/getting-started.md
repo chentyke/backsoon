@@ -26,7 +26,7 @@ backsoon.dev から直接インストールする場合はこちらを使いま�
 npm i -g https://backsoon.dev/backsoon.tgz && backsoon setup
 ```
 
-セットアップ時に `y` を入力すると、`~/.codex/AGENTS.md`（または `$CODEX_HOME/AGENTS.md`）にルールが追加されます。Enter のみでスキルだけをインストールできます。対話なしでルールも追加するには `backsoon setup --yes` を実行します。削除するには BackSoon のコメントで囲まれた部分をコメントごと削除してください。
+setup はスキルをインストールし、`hooks.json` に完了通知を登録します。`~/.codex/AGENTS.md`（または `$CODEX_HOME/AGENTS.md`）の BackSoon のルールはおすすめですが必須ではありません。追加すると、Codex が時間のかかるコマンドを自分から BackSoon に任せます。ガイドでは内容を確認してから追加でき、ブラウザーがない環境では setup がターミナルで確認します。非対話環境ではこのファイルを変更しません。`--rules` で追加、`--no-rules` で削除できます。追加後に再実行するとルールは最新に保たれ、他の記述は保持されます。スキルだけをインストールするには `backsoon setup --skill-only` を使います。続いて「BackSoon completion notices」という名前の 4 つのフックを許可します。Codex アプリでは **設定 › フック** を開き、それぞれ **信頼する** を選びます。確認が必要なのが BackSoon だけなら **すべて信頼する** を選べます。Codex CLI では `/hooks` を入力し、イベント一覧で `t` を押すと 4 件をまとめて許可できます。ほかにも確認待ちのフックがある場合は、個別に確認してください。
 
 2行目は Codex にスキルを登録します。チャットに通知するには、`codex queue --help` で `--resume` が使えることを確認し、新しいチャットで「BackSoon で sleep 3 を実行して、終わったら知らせて」と依頼してください。端末だけで使うときは `--notify off` を指定します。
 

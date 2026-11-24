@@ -13,6 +13,8 @@ npm i -g backsoon
 backsoon setup
 ```
 
+setup はスキルをインストールし、完了通知を登録します。Codex のサイドパネルまたは既定のブラウザーでガイドが開き、完了通知を許可する手順を確認できます。ガイドでは共通の `AGENTS.md` に追加するおすすめのルールも表示され、追加、スキップ、後からの削除を選べます。ブラウザーがない環境では、setup がターミナルで確認します。事前に決めるには `--rules` または `--no-rules`、ガイドを省略するには `--no-open`、スキルだけを追加するには `--skill-only` を使用してください。
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/session-dark.ja.png">
   <img alt="同じ Codex セッション：BackSoon なしでは 14 分のビルドをポーリングしてログでコンテキストが埋まり、BackSoon ありではターンがすぐ終わり、待つ間のトークンはゼロで、結果 1 行だけがチャットに戻る" src="docs/images/session-light.ja.png">

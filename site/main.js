@@ -533,7 +533,7 @@ function renderDetails(task) {
     [t('warnTime'), task.warnAfter && elapsed(task.warnAfter)], [t('verified'), task.reason && t(task.reason)],
     [t('originalResult'), task.status === 'resolved' && t('failed')],
     [t('exitCode'), ACTIVE.has(task.status) || task.code == null ? null : task.code],
-    [t('notifyMode'), t('resume')], [t('chatNotice'), ACTIVE.has(task.status) ? t('pending') : t('queued')],
+    [t('notifyMode'), t('steer')], [t('chatNotice'), ACTIVE.has(task.status) ? t('pending') : t('queued')],
   ];
   const signature = JSON.stringify(fields);
   const box = metadata.querySelector('dl');

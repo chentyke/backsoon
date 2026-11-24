@@ -277,3 +277,132 @@ dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* setup guide: the task window's anatomy, laid out as a page */
+.guide-page .bar, .guide { max-width: 640px; }
+.guide { padding-top: 6px; padding-bottom: 48px; }
+.setup { border-radius: 28px; background: var(--surface); box-shadow: var(--card-shadow-hover); overflow: hidden; }
+.setup .dialog-head { grid-template-columns: 44px minmax(0, 1fr); padding: 22px 22px 16px; }
+.setup h1 { margin: 0 0 3px; font-size: 21px; line-height: 1.2; font-weight: 700; letter-spacing: -.03em; }
+.setup .dialog-body { gap: 8px; padding: 0 22px 22px; overflow: visible; }
+.setup .meta .status { min-height: 1.45em; }
+.setup[data-state=checking] .meta .status, .step:is([data-state=checking], [data-state=saving]) .step-state {
+  --status-ink: var(--muted);
+  background: linear-gradient(90deg, var(--status-ink) 40%, var(--shine) 50%, var(--status-ink) 60%) 100% 0 / 250% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: shimmer 1.8s linear infinite;
+}
+#lede { margin-bottom: 4px; line-height: 1.55; transition: background-color .5s, color .5s; }
+.setup[data-state=ready] #lede { background: color-mix(in srgb, var(--tone) 10%, var(--surface)); color: color-mix(in srgb, var(--tone) 70%, var(--ink)); font-weight: 550; }
+
+/* finished: the BackSoon sign hangs in the tile */
+.setup .tile { position: relative; transition: background-color .4s; }
+.setup .tile > * { grid-area: 1 / 1; }
+#overall-glyph { transition: opacity .18s ease-in, transform .18s ease-in, filter .18s ease-in; }
+.setup[data-complete] #overall-glyph { opacity: 0; transform: scale(.5) rotate(30deg); filter: blur(4px); }
+.setup[data-complete] .tile { background: color-mix(in srgb, var(--blue) 11%, transparent); }
+.mark { display: none; width: 34px; height: 34px; margin-top: -2px; overflow: visible; }
+.setup[data-complete] .mark { display: block; }
+.mark-sign, .mark-nail, .mark-glow { transform-box: view-box; transform-origin: 32px 9.6px; }
+.mark-board { fill: light-dark(#344be4, #a9b7ff); }
+.mark-string { fill: none; stroke: light-dark(#17213b, #faf7ef); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.mark-nail circle:first-child { fill: #f3a41d; }
+.mark-glow { fill: none; stroke: #f3a41d; stroke-width: 1.6; opacity: 0; }
+.mark-check {
+  display: none; place-self: end; width: 18px; height: 18px; margin: 0 -5px -5px 0; border-radius: 50%;
+  background: var(--green); box-shadow: 0 0 0 2.5px var(--surface);
+}
+.setup[data-complete] .mark-check { display: grid; }
+.mark-check svg { width: 18px; height: 18px; fill: none; stroke: var(--on-tone); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.confetti { position: fixed; inset: 0; z-index: 50; overflow: hidden; pointer-events: none; }
+.confetti i { position: absolute; display: block; translate: -50% -50%; }
+.confetti .bit-sign { width: 11px; height: 7px; border-radius: 2.5px; background: light-dark(#344be4, #a9b7ff); }
+.confetti .bit-nail { width: 7px; height: 7px; border-radius: 50%; background: #f3a41d; }
+.confetti .bit-string { width: 2.5px; height: 11px; border-radius: 2px; background: light-dark(#17213b, #faf7ef); }
+.confetti .bit-done { width: 7px; height: 7px; border-radius: 2px; background: var(--green); }
+
+.setup section + section { margin: 0; }
+.step { padding: 14px 16px; border-radius: 20px; background: var(--raised); }
+.step-head { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: start; gap: 12px; }
+.step-head > .glyph { margin-top: 1px; }
+.step h2 { margin: 0; color: var(--ink); font-size: 14px; line-height: 1.45; font-weight: 620; letter-spacing: -.01em; }
+.step [role=status] { margin: 1px 0 0; color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
+.step [role=status]:empty::before {
+  content: ""; display: block; width: min(240px, 70%); height: 9px; margin: 6px 0 3px; border-radius: 99px;
+  background: linear-gradient(90deg, var(--faint) 40%, color-mix(in srgb, var(--faint) 40%, transparent) 50%, var(--faint) 60%) 100% 0 / 250% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+.step-aside { display: flex; align-items: center; gap: 10px; line-height: 1.45; }
+.step-state { flex: none; font-size: 12px; font-weight: 620; color: var(--tone); white-space: nowrap; line-height: 21px; }
+.step[data-state=offer] .step-state { padding: 0 9px; border-radius: 99px; background: color-mix(in srgb, var(--tone) 12%, transparent); }
+.step .pips { display: flex; }
+.pip[data-state=skipped] { background: color-mix(in srgb, var(--ink) 14%, transparent); }
+
+.fix { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .45s var(--bar-ease), opacity .3s; }
+.fix[data-open=true] { grid-template-rows: 1fr; opacity: 1; }
+/* the clip box reaches past the content so card shadows inside it are not cut; negative margins cancel the extra room */
+.fix > div { min-height: 0; overflow: hidden; padding: 0 12px 16px 44px; margin: 0 -12px -16px; }
+.preview { margin: 12px 0 0; border-radius: 14px; background: var(--surface); box-shadow: var(--card-shadow); overflow: hidden; }
+.preview figcaption { padding: 10px 14px 0; color: var(--muted); font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+.preview figcaption code { font: 11.5px/1.5 var(--mono); color: var(--ink); }
+.preview pre .code { font: 11.5px/1.6 var(--mono); }
+.preview pre {
+  height: auto; max-height: 150px; padding: 6px 14px 14px; color: var(--ink); font-family: inherit; font-size: 12.5px; line-height: 1.65;
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent); -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent);
+}
+.choices { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+:is(.primary, .quiet) {
+  display: inline-flex; align-items: center; height: 34px; padding: 0 16px; border: 0; border-radius: 99px;
+  font-size: 13px; font-weight: 620; white-space: nowrap; transition: transform .2s var(--ease-out), background-color .2s, opacity .2s;
+}
+.primary { background: var(--blue); color: var(--on-tone); box-shadow: 0 1px 2px color-mix(in srgb, var(--blue) 30%, transparent), 0 4px 12px -4px color-mix(in srgb, var(--blue) 45%, transparent); }
+.primary:hover { background: color-mix(in srgb, var(--blue) 88%, var(--shine)); }
+.quiet { background: transparent; color: var(--muted); }
+.quiet:hover { background: var(--faint); color: var(--ink); }
+:is(.primary, .quiet):active { transform: scale(.95); }
+:is(.primary, .quiet, .link):disabled { cursor: default; opacity: .55; transform: none; }
+.link { margin-top: 6px; padding: 2px 0; border: 0; background: none; color: var(--blue); font-size: 12.5px; font-weight: 600; }
+.link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.step-error { margin: 10px 0 0 32px; color: var(--red); font-size: 12.5px; font-weight: 550; overflow-wrap: anywhere; }
+.how { display: grid; gap: 12px; margin: 12px 0 2px; }
+.seg-switch { justify-self: start; display: inline-flex; gap: 2px; padding: 3px; border-radius: 99px; background: var(--faint); }
+.seg-switch button {
+  height: 28px; padding: 0 13px; border: 0; border-radius: 99px; background: transparent; color: var(--muted);
+  font-size: 12.5px; font-weight: 620; white-space: nowrap; transition: background-color .25s, color .25s, box-shadow .25s;
+}
+.seg-switch button:hover { color: var(--ink); }
+.seg-switch [aria-selected=true] { background: var(--surface); color: var(--ink); box-shadow: var(--card-shadow); }
+.steps { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; counter-reset: how; font-size: 13px; line-height: 1.55; }
+.steps li { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 10px; overflow-wrap: anywhere; }
+.steps li::before {
+  counter-increment: how; content: counter(how); display: grid; place-items: center; width: 20px; height: 20px; margin-top: 1px;
+  border-radius: 99px; background: var(--surface); box-shadow: var(--card-shadow); color: var(--muted); font-size: 11px; font-weight: 650; font-variant-numeric: tabular-nums;
+}
+.how :is(code, kbd) { padding: 1px 6px; border-radius: 6px; background: var(--surface); box-shadow: 0 0 0 .5px var(--line); font: 12px/1.5 var(--mono); }
+.how code.chip { color: var(--blue); font-weight: 600; }
+.how kbd { display: inline-block; min-width: 1.7em; text-align: center; box-shadow: 0 0 0 .5px var(--line), 0 1.5px 0 var(--line); font-weight: 600; }
+/* a control in the Codex app, named as the app shows it */
+.how .ui { padding: 1px 7px; border-radius: 6px; background: var(--surface); box-shadow: 0 0 0 .5px var(--line); font-weight: 620; white-space: nowrap; }
+.tip { margin: -2px 0 0 30px; color: var(--muted); font-size: 12.5px; line-height: 1.55; overflow-wrap: anywhere; }
+
+.setup-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 22px 16px; border-top: 1px solid var(--line); }
+#checked { min-width: 0; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+#recheck {
+  display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 14px 0 11px; border: 0; border-radius: 99px;
+  background: var(--raised); color: var(--ink); font-size: 13px; font-weight: 600; white-space: nowrap; transition: transform .2s var(--ease-out), background-color .2s;
+}
+#recheck:hover { background: var(--faint); }
+#recheck:active { transform: scale(.95); }
+#recheck:disabled { cursor: default; color: var(--muted); }
+#recheck svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+#recheck[data-spinning] svg { animation: spin .9s linear infinite; }
+@media (max-width: 560px) {
+  .setup { border-radius: 24px; }
+  .setup .dialog-head { padding: 18px 16px 14px; gap: 12px; }
+  .setup .dialog-body { padding: 0 12px 12px; }
+  .setup h1 { font-size: 19px; }
+  .step { padding: 13px 14px; }
+  .fix > div { padding-inline-start: 12px; }
+  .step-error { margin-inline-start: 0; }
+  .setup-foot { padding: 12px 16px 14px; }
+}

@@ -17,6 +17,8 @@ backsoon stop TASK_ID
 
 Arguments after `--` go straight to the executable. Use `sh -c '…'` for pipes or other shell syntax. Use `--cwd` to choose the command's working directory. Stopping a command stops its process group. For a failed command whose intended outcome you have independently verified, use `backsoon resolve TASK_ID --reason "what I checked"`. The panel keeps the original exit code.
 
+For a build followed by installation, start the build with `backsoon start`. In the completion turn, run `backsoon start --after-success BUILD_ID -- INSTALL_COMMAND`. The build must have succeeded. Repeating the same follow-up from the same working directory returns the original installation's ID, including after it finishes. A different command is rejected. If the installation itself fails, check its result before explicitly retrying.
+
 ## Open the panel
 
 `backsoon panel` prints a local URL. In Codex desktop the skill opens the panel beside the originating chat. Pass `--no-panel` at startup to skip this. Use `panel --chat CHAT_ID`, `panel --task TASK_ID` or `panel --all` for a specific view. The panel listens on loopback and uses port 47174 by default. Set `BACKSOON_PORT` before starting the service to choose another port. Closing the page leaves tasks running.
@@ -36,17 +38,19 @@ Direct `gh pr checks --watch` and `gh run watch RUN_ID` commands also read check
 
 | Option | What happens |
 | --- | --- |
-| `--notify resume` (default) | Queue the message and ask Codex to resume the originating chat. |
-| `--notify steer` | Deliver to the active turn. If the turn is unavailable, queue the message and request a resume. |
+| `--notify resume` | Queue the message and ask Codex to resume the originating chat. |
+| `--notify steer` (default) | Deliver to the active turn. If the turn is unavailable, queue the message and request a resume. |
 | `--notify queue` | Queue the message for the chat to read later. |
 | `--notify off` or `--no-notify` | Keep results in the local panel. |
+
+If the Codex service reports that the chat is not loaded, BackSoon queues the message with a resume request. If the service disconnects after a direct send and delivery is uncertain, BackSoon records that uncertainty without sending the message again.
 
 The destination defaults to `CODEX_THREAD_ID`. Use `--thread CHAT_ID` to choose another chat. `--remote` or `BACKSOON_REMOTE` selects the Codex service used for delivery. The service needs access to the originating chat. The panel records delivery separately from command success. If the local service denies access at startup, BackSoon prints the task ID and a warning. Follow the task with `backsoon show TASK_ID`. When the panel offers `backsoon retry-notice TASK_ID`, run it with permission to connect to send the original completion message. This leaves the command’s result intact. If delivery is uncertain, check the destination chat.
 
 ## Observe an existing process or chat
 
 ```sh
-backsoon attach PID --name "Compilation" --notify resume
+backsoon attach PID --name "Compilation"
 backsoon wait-chat CHAT_ID --after-task --timeout 1800
 backsoon wait-chat CHAT_ID OTHER_CHAT_ID --timeout 1800
 backsoon wait-chat CHAT_ID --final-line "All checks complete"

@@ -1,3 +1,5 @@
+import { spawn } from 'node:child_process';
+import { createInterface } from 'node:readline';
 import { msg } from './locale.js';
 export class Rejected extends Error {
   constructor(error, method) {
@@ -48,8 +50,19 @@ export class Rpc {
       clearTimeout(timer);
     }
   }
-  async initialize(deadline) {
-    await this.call('initialize', { clientInfo: { name: 'backsoon', version: '1' } }, deadline);
+  async initialize(deadline, capabilities) {
+    await this.call('initialize', { clientInfo: { name: 'backsoon', version: '1' }, capabilities }, deadline);
     this.send({ method: 'initialized' });
   }
+}
+
+export function openAppServer() {
+  const child = spawn('codex', ['app-server', '--stdio'], { stdio: ['pipe', 'pipe', 'ignore'] });
+  const api = new Rpc((msg) => child.stdin.write(JSON.stringify(msg) + '\n'));
+  const lines = createInterface({ input: child.stdout });
+  lines.on('line', (line) => api.receive(line));
+  child.on('error', (e) => api.close(e));
+  child.stdin.on('error', (e) => api.close(e));
+  child.on('close', () => api.close());
+  return { api, close() { lines.close(); child.kill('SIGKILL'); } };
 }

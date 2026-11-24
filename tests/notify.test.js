@@ -8,7 +8,7 @@ import { WebSocketServer } from 'ws';
 import { entry } from '../src/store.js';
 import { exec, sandbox, until } from './helpers.js';
 
-test('unix WebSocket steers active turns, falls back only on known failures', async (t) => {
+test('default notifications interrupt an active turn, resume an idle chat and avoid a second send after a lost acknowledgement', async (t) => {
   const h = sandbox(t),
     socket = path.join(h.dir, 'ws.sock');
   const server = http.createServer(),
@@ -27,7 +27,7 @@ test('unix WebSocket steers active turns, falls back only on known failures', as
       if (!q.id) return;
       let result = {};
       if (q.method === 'thread/read')
-        result = { thread: { status: { type: behavior === 'idle' ? 'idle' : 'active' } } };
+        result = { thread: { status: { type: behavior === 'unloaded' ? 'notLoaded' : behavior === 'idle' ? 'idle' : 'active' } } };
       if (q.method === 'thread/turns/list') result = { data: [{ id: 'turn', status: 'inProgress' }] };
       if (q.method === 'turn/steer') {
         assert.equal(q.params.expectedTurnId, 'turn');
@@ -47,6 +47,7 @@ test('unix WebSocket steers active turns, falls back only on known failures', as
   for (const [mode, expected] of [
     ['active', 'steered'],
     ['idle', 'queued'],
+    ['unloaded', 'queued'],
     ['rejected', 'queued'],
     ['disconnect', 'unknown'],
   ]) {
@@ -55,8 +56,6 @@ test('unix WebSocket steers active turns, falls back only on known failures', as
     const count = h.calls().length;
     const id = await h.cli(
       'start',
-      '--notify',
-      'steer',
       '--remote',
       'unix://' + socket,
       '--',
@@ -64,9 +63,24 @@ test('unix WebSocket steers active turns, falls back only on known failures', as
       'finished',
     );
     const n = await until(async () => JSON.parse(await h.cli('show', id)).notice);
+    assert.equal(h.state(id).notify, 'steer');
     assert.equal(n.state, expected);
+    if (expected === 'queued') assert.ok(h.calls().at(-1).includes('--resume'));
     assert.equal(h.calls().length - count, expected === 'queued' ? 1 : 0);
-    assert.equal(requests.filter((q) => q.method === 'turn/steer').length, mode === 'idle' ? 0 : 1);
+    assert.equal(requests.filter((q) => q.method === 'turn/steer').length, ['idle', 'unloaded'].includes(mode) ? 0 : 1);
+  }
+  behavior = 'active';
+  for (const mode of ['resume', 'queue', 'off']) {
+    requests = [];
+    const before = h.calls().length;
+    const id = await h.cli('start', '--notify', mode, '--remote', 'unix://' + socket, '--', 'true');
+    await h.ended(id);
+    if (mode !== 'off') {
+      await until(() => h.calls().length > before);
+      assert.equal(h.calls().at(-1).includes('--resume'), mode === 'resume');
+    }
+    assert.equal(h.calls().length, before + Number(mode !== 'off'));
+    assert.equal(requests.length, 0);
   }
 });
 

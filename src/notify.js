@@ -1,4 +1,5 @@
 import { msg } from './locale.js';
+import { offerCompletion } from './receiver.js';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -116,14 +117,17 @@ async function queue(task, message) {
 }
 async function deliver(file, task, message, finished, issues) {
   let state, detail, retryable;
-  if (task.notify === 'steer')
-    [state, detail] = await steer(task.notify_thread, message, task.remote);
+  if (task.notify === 'steer') {
+    state = finished ? await offerCompletion(task) : 'fallback';
+    if (state === 'unknown') detail = msg('partialAck');
+    if (state === 'fallback') [state, detail] = await steer(task.notify_thread, message, task.remote);
+  }
   if (!state || state === 'fallback') {
     const reason = detail;
     [state, detail, retryable] = await queue(task, message);
     if (reason) detail = [msg('queueFallback', { reason }), detail].filter(Boolean).join('\n');
   }
-  const notice = { state, detail, time: now(), issues: issues + Number(!['steered', 'queued'].includes(state)) };
+  const notice = { state, detail, time: now(), issues: issues + Number(!['steered', 'received', 'queued'].includes(state)) };
   if (finished && retryable) notice.retryMessage = message;
   save(file, notice);
   return notice;

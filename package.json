@@ -1,6 +1,6 @@
 {
   "name": "backsoon",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -8,6 +8,20 @@
   },
   "homepage": "https://backsoon.dev",
   "description": "Run background commands and send the result back to the originating Codex chat.",
+  "keywords": [
+    "codex",
+    "cli",
+    "background-tasks",
+    "notifications",
+    "long-running-commands",
+    "build",
+    "ci",
+    "developer-tools"
+  ],
+  "author": "chentyke",
+  "bugs": {
+    "url": "https://github.com/chentyke/backsoon/issues"
+  },
   "type": "module",
   "bin": {
     "backsoon": "backsoon"

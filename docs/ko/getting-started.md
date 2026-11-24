@@ -26,7 +26,7 @@ backsoon.dev에서 직접 설치하려면 다음 명령을 사용하세요.
 npm i -g https://backsoon.dev/backsoon.tgz && backsoon setup
 ```
 
-설치 중 `y`를 입력하면 `~/.codex/AGENTS.md`(또는 `$CODEX_HOME/AGENTS.md`)에 규칙이 추가됩니다. Enter만 누르면 스킬만 설치합니다. 확인 없이 규칙도 추가하려면 `backsoon setup --yes`를 실행하세요. 규칙을 삭제하려면 BackSoon 주석으로 표시된 부분을 주석과 함께 지우세요.
+setup은 스킬을 설치하고 `hooks.json`에 완료 알림을 등록합니다. `~/.codex/AGENTS.md`(또는 `$CODEX_HOME/AGENTS.md`)의 BackSoon 규칙은 권장 사항이며 필수는 아닙니다. 추가하면 Codex가 오래 걸리는 명령을 알아서 BackSoon에 맡깁니다. 설정 안내에서 내용을 확인한 뒤 추가할 수 있고, 브라우저가 없으면 setup이 터미널에서 묻습니다. 비대화형 설치에서는 이 파일을 바꾸지 않습니다. `--rules`로 추가하고 `--no-rules`로 제거할 수 있습니다. 추가한 뒤 다시 실행하면 규칙이 최신으로 유지되고 다른 내용은 보존됩니다. 스킬만 설치하려면 `backsoon setup --skill-only`를 사용하세요. 이어서 “BackSoon completion notices”라는 이름의 훅 네 개를 승인합니다. Codex 앱에서는 **설정 › Hook**을 열고 각각 **신뢰**를 선택하세요. BackSoon만 검토하면 되는 경우 **모두 신뢰**를 선택할 수 있습니다. Codex CLI에서는 `/hooks`를 입력하고 이벤트 목록에서 `t`를 누르면 네 개를 한 번에 승인합니다. 검토할 다른 훅이 있으면 하나씩 검토하세요.
 
 두 번째 명령은 Codex에서 스킬을 사용할 수 있도록 등록합니다. 채팅 알림을 받으려면 `codex queue --help`에서 `--resume` 지원 여부를 확인하세요. 새 채팅에서 “BackSoon으로 sleep 3을 실행하고 끝나면 알려줘”라고 요청하면 됩니다. 터미널에서만 사용하려면 `--notify off`를 지정하세요.
 

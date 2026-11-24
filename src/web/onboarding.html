@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-msg="guideTitle">Set up BackSoon</title>
+  <link rel="icon" type="image/svg+xml" href="/brand/mark.svg">
+  <link rel="icon" type="image/svg+xml" href="/brand/mark-dark.svg" media="(prefers-color-scheme: dark)">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/onboarding.js" type="module"></script>
+</head>
+<body class="guide-page">
+  <header><div class="bar">
+    <picture class="brand">
+      <source media="(prefers-color-scheme: dark)" srcset="/brand/logo-dark.svg">
+      <img src="/brand/logo.svg" width="122" height="26" alt="BackSoon">
+    </picture>
+    <label class="picker"><select id="language" aria-label="Language" data-label="language">
+      <option value="en" lang="en">English</option>
+      <option value="zh-CN" lang="zh-CN">简体中文</option>
+      <option value="zh-TW" lang="zh-Hant">繁體中文</option>
+      <option value="ja" lang="ja">日本語</option>
+      <option value="ko" lang="ko">한국어</option>
+    </select></label>
+  </div></header>
+  <main class="guide">
+    <article class="setup" id="setup" data-tone="blue" aria-busy="true">
+      <div class="dialog-head">
+        <span class="tile">
+          <span class="glyph" id="overall-glyph" aria-hidden="true"></span>
+          <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+            <mask id="mark-cut" maskUnits="userSpaceOnUse" x="-8" y="-8" width="80" height="80">
+              <rect x="-8" y="-8" width="80" height="80" fill="#fff"/>
+              <path class="mark-arrow" pathLength="1" d="M43.6 34.4v4.9a3.8 3.8 0 0 1-3.8 3.8H21.4M27 37.6l-5.6 5.5 5.6 5.5" fill="none" stroke="#000" stroke-width="4.3" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="15.2" cy="33.2" r="2.15" fill="#000"/>
+              <circle cx="48.8" cy="33.2" r="2.15" fill="#000"/>
+            </mask>
+            <circle class="mark-glow" cx="32" cy="9.6" r="4.6"/>
+            <g class="mark-sign">
+              <path class="mark-board" transform="rotate(-6 32 42)" d="M14.15 27.5H49.85C56.95 27.5 60 30.55 60 37.65V46.85C60 53.95 56.95 57 49.85 57H14.15C7.04 57 4 53.95 4 46.85V37.65C4 30.55 7.04 27.5 14.15 27.5Z" mask="url(#mark-cut)"/>
+              <path class="mark-string" d="M14.37 35.00 32 9.6 47.79 31.49"/>
+            </g>
+            <g class="mark-nail"><circle cx="32" cy="9.6" r="4.6"/><circle cx="30.6" cy="8.2" r="1.3" fill="#fff" fill-opacity=".38"/></g>
+          </svg>
+          <span class="mark-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7.6 12.4l3 3 5.8-6.4"/></svg></span>
+        </span>
+        <div class="setup-title">
+          <h1 data-msg="guideTitle">Set up BackSoon</h1>
+          <div class="meta"><span class="status" id="overall" aria-live="polite"></span></div>
+        </div>
+      </div>
+      <div class="dialog-body">
+        <p class="hero hint" id="lede"></p>
+
+        <section class="step" id="step-hooks" data-tone="blue">
+          <div class="step-head">
+            <span class="glyph" aria-hidden="true"></span>
+            <div class="step-text">
+              <h2 data-msg="guideHooks">Completion notifications</h2>
+              <p id="hooks" role="status"></p>
+            </div>
+            <span class="step-aside">
+              <span class="pips" id="hook-pips" aria-hidden="true"></span>
+              <span class="status step-state"></span>
+            </span>
+          </div>
+          <div class="fix" id="hooks-fix" data-open="false"><div>
+            <div class="how" id="how">
+              <div class="seg-switch" role="tablist" data-label="guideWhere">
+                <button type="button" role="tab" id="tab-desktop" aria-controls="how-desktop" data-where="desktop" data-msg="guideTabDesktop">Codex app</button>
+                <button type="button" role="tab" id="tab-cli" aria-controls="how-cli" data-where="cli" data-msg="guideTabCli">Codex CLI</button>
+              </div>
+              <ol class="steps" id="how-desktop" role="tabpanel" aria-labelledby="tab-desktop">
+                <li data-rich="guideDeskOpen"></li>
+                <li data-rich="guideDeskTrust"></li>
+                <li data-rich="guideStepReturn"></li>
+              </ol>
+              <p class="tip" id="desk-tip" data-rich="guideDeskTip"></p>
+              <ol class="steps" id="how-cli" role="tabpanel" aria-labelledby="tab-cli">
+                <li data-rich="guideStepOpen"></li>
+                <li data-rich="guideStepTrust"></li>
+                <li data-rich="guideStepReturn"></li>
+              </ol>
+            </div>
+          </div></div>
+        </section>
+
+        <section class="step" id="step-rules" data-tone="blue">
+          <div class="step-head">
+            <span class="glyph" aria-hidden="true"></span>
+            <div class="step-text">
+              <h2 data-msg="guideRules">Global instructions</h2>
+              <p id="rules" role="status"></p>
+            </div>
+            <span class="status step-state"></span>
+          </div>
+          <div class="fix" id="rules-fix" data-open="false"><div>
+            <figure class="preview">
+              <figcaption id="preview-file"></figcaption>
+              <pre id="preview" tabindex="0"></pre>
+            </figure>
+            <div class="choices">
+              <button type="button" class="primary" id="add-rules" data-msg="guideAddRules">Add to AGENTS.md</button>
+              <button type="button" class="quiet" id="skip-rules" data-msg="guideSkip">Not now</button>
+            </div>
+          </div></div>
+          <div class="fix" id="rules-more" data-open="false"><div>
+            <button type="button" class="link" id="rules-toggle"></button>
+          </div></div>
+          <p class="step-error" id="rules-error" role="alert" hidden></p>
+        </section>
+      </div>
+      <footer class="setup-foot">
+        <span id="checked"></span>
+        <button type="button" id="recheck">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/></svg>
+          <span data-msg="guideCheck">Check again</span>
+        </button>
+      </footer>
+    </article>
+  </main>
+</body>
+</html>

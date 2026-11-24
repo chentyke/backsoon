@@ -1,8 +1,6 @@
 import { msg } from './locale.js';
-import { spawn } from 'node:child_process';
-import { createInterface } from 'node:readline';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { Rpc, Rejected } from './rpc.js';
+import { openAppServer, Rejected } from './rpc.js';
 
 const notice = /^\[BackSoon ([a-f0-9]{12}) done\] /;
 function matches(item, id) {
@@ -105,13 +103,7 @@ export async function waitChat(config) {
   report('running');
   console.log(msg('awaitReply', { chat: config.chat }));
   while (Date.now() < end) {
-    const child = spawn('codex', ['app-server', '--stdio'], { stdio: ['pipe', 'pipe', 'ignore'] });
-    const api = new Rpc((msg) => child.stdin.write(JSON.stringify(msg) + '\n'));
-    const lines = createInterface({ input: child.stdout });
-    lines.on('line', (line) => api.receive(line));
-    child.on('error', (e) => api.close(e));
-    child.stdin.on('error', (e) => api.close(e));
-    child.on('close', () => api.close());
+    const { api, close } = openAppServer();
     try {
       await api.initialize(end);
       while (Date.now() < end) {
@@ -159,8 +151,7 @@ export async function waitChat(config) {
         return 1;
       }
     } finally {
-      lines.close();
-      child.kill('SIGKILL');
+      close();
     }
     await sleep(Math.min(1000, Math.max(0, end - Date.now())));
   }
