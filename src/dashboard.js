@@ -1,4 +1,5 @@
-import { catalogs } from './web/i18n.js';
+import { catalogs, translator } from './web/i18n.js';
+import { sendToChat } from './notify.js';
 import { setupStatus } from './onboarding.js';
 import { msg } from './locale.js';
 import fs from 'node:fs';
@@ -98,13 +99,15 @@ function sendJson(res, code, data) {
 // A page on another site cannot reach it: the Host and Origin must be this
 // server, the JSON body and custom headers force a CORS preflight that is
 // never answered, and the token only exists in the guide's own URL fragment.
-async function changeRules(req, res, token, readStatus) {
+function fromGuide(req, token) {
   const self = ['http://127.0.0.1:' + req.socket.localPort, 'http://localhost:' + req.socket.localPort];
   const sent = String(req.headers['x-backsoon-token'] || '');
-  if (!self.includes(req.headers.origin) || req.headers['x-backsoon-guide'] !== '1' ||
-      !/^application\/json\b/.test(req.headers['content-type'] || '') ||
-      sent.length !== token.length || !crypto.timingSafeEqual(Buffer.from(sent), Buffer.from(token)))
-    return res.writeHead(403).end();
+  return self.includes(req.headers.origin) && req.headers['x-backsoon-guide'] === '1' &&
+    /^application\/json\b/.test(req.headers['content-type'] || '') &&
+    sent.length === token.length && crypto.timingSafeEqual(Buffer.from(sent), Buffer.from(token));
+}
+async function changeRules(req, res, token, readStatus) {
+  if (!fromGuide(req, token)) return res.writeHead(403).end();
   let enabled, locale;
   try {
     ({ enabled, locale } = JSON.parse(await readBody(req)));
@@ -119,7 +122,39 @@ async function changeRules(req, res, token, readStatus) {
   }
   sendJson(res, 200, await readStatus(true));
 }
-async function handle(req, res, onboarding, readStatus, token) {
+// The guide's other action: start the sample task and ask the chat that ran
+// setup to open its panel. The guide starts the task itself because it runs
+// with the access setup was given, so the task can report back; a command
+// Codex runs in its sandbox may not reach the chat. The task starts once per
+// guide and the prompt is sent once; only a failed step is retried. The
+// prompt is fixed here, and the page only picks its language, so the endpoint
+// can never put other text into the chat.
+async function sendDemo(req, res, token, demo) {
+  if (!fromGuide(req, token)) return res.writeHead(403).end();
+  let locale;
+  try {
+    ({ locale } = JSON.parse(await readBody(req)));
+  } catch {
+    return res.writeHead(400).end();
+  }
+  if (!Object.hasOwn(catalogs, locale)) return res.writeHead(400).end();
+  if (!demo.thread) return sendJson(res, 409, { state: null });
+  demo.pending ??= (async () => {
+    demo.task ??= await (await import('./cli.js')).startDemo();
+    const url = await launch(demo.thread);
+    return sendToChat(demo.thread, translator(locale)('demoPrompt', { id: demo.task, url }),
+      process.env.BACKSOON_REMOTE ?? null);
+  })()
+    .catch(error => ({ state: 'failed', detail: error.message }))
+    .then(result => {
+      if (result.state === 'failed') demo.pending = null;
+      else demo.state = result.state;
+      return result;
+    });
+  const { state, detail } = await demo.pending;
+  sendJson(res, state === 'failed' ? 502 : 200, { state, detail: detail || '' });
+}
+async function handle(req, res, onboarding, readStatus, token, demo) {
   const host = req.headers.host,
     port = req.socket.localPort;
   if (host !== '127.0.0.1:' + port && host !== 'localhost:' + port) {
@@ -129,6 +164,10 @@ async function handle(req, res, onboarding, readStatus, token) {
   if (onboarding && req.url === '/api/rules') {
     if (req.method !== 'POST') return res.writeHead(405, { Allow: 'POST' }).end();
     return changeRules(req, res, token, readStatus).catch(() => res.writeHead(500).end());
+  }
+  if (onboarding && req.url === '/api/demo') {
+    if (req.method !== 'POST') return res.writeHead(405, { Allow: 'POST' }).end();
+    return sendDemo(req, res, token, demo).catch(() => res.writeHead(500).end());
   }
   if (req.method !== 'GET') {
     res.writeHead(405).end();
@@ -182,15 +221,18 @@ function running() {
 }
 export async function serve(port, { onboarding = false } = {}) {
   let idle, pending;
+  // The chat that ran setup, which the guide can ask to start the demo.
+  const demo = { thread: process.env.CODEX_THREAD_ID || null, pending: null, state: null, task: null };
   // After a write, wait for any check already in flight, then read afresh.
   const readStatus = async (fresh = false) => {
     if (fresh) await pending?.catch(() => {});
-    return pending ??= setupStatus().finally(() => { pending = null; });
+    const status = await (pending ??= setupStatus().finally(() => { pending = null; }));
+    return { ...status, demo: demo.thread ? demo.state ?? 'ready' : null };
   };
   const token = crypto.randomBytes(16).toString('hex');
   const server = http.createServer((req, res) => {
     idle?.refresh();
-    void handle(req, res, onboarding, readStatus, token);
+    void handle(req, res, onboarding, readStatus, token, demo);
   });
   server.listen(port, '127.0.0.1');
   try {

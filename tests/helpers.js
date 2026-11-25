@@ -35,15 +35,29 @@ export function sandbox(t) {
     BACKSOON_REMOTE: 'unix:///unused',
     PATH: dir + path.delimiter + process.env.PATH,
     CAPTURE: path.join(dir, 'queue.jsonl'),
+    BACKSOON_PICKUP_WAIT: '1',
   };
   delete env.CODEX_APP_TOOLS_PIPE_PATH;
+  delete env.CODEX_APP_RUNTIME_CLI_PATH;
+  delete env.CODEX_SANDBOX;
+  delete env.CODEX_SANDBOX_NETWORK_DISABLED;
   const write = (name, body) => fs.writeFileSync(path.join(dir, name), body);
   write(
     'codex',
     '#!' +
       process.execPath +
       "\nconst fs = require('node:fs');\n" +
+      // An app server whose chat shows the last queued message in turn NOTICE_TURN.
+      "if (process.argv[2]==='app-server') { require('node:readline').createInterface({input:process.stdin}).on('line', line => {\n" +
+      "  const q = JSON.parse(line); if (q.id == null) return;\n" +
+      "  const sent = () => { const calls = fs.existsSync(process.env.CAPTURE) ? fs.readFileSync(process.env.CAPTURE, 'utf8').trim().split('\\n').map(JSON.parse) : []; const call = calls.at(-1) || []; return call[call.indexOf('--message') + 1]; };\n" +
+      "  const turns = () => process.env.NOTICE_TURN && sent() ? [{id: process.env.NOTICE_TURN, items: [{type: 'userMessage', content: [{type: 'text', text: sent()}]}]}] : [];\n" +
+      "  const result = q.method === 'initialize' ? {} : q.method === 'thread/turns/list' ? {data: turns(), nextCursor: null} : null;\n" +
+      "  console.log(JSON.stringify(result ? {id: q.id, result} : {id: q.id, error: {code: -32601, message: 'unsupported'}}));\n" +
+      "}); return; }\n" +
       "if (process.argv[2]!=='queue') process.exit(2);\n" +
+      // Option probes are not deliveries. QUEUE_HELP imitates an older CLI.
+      "if (process.argv.includes('--help')) { console.log(process.env.QUEUE_HELP ?? '      --resume\\n      --remote <ADDR>'); process.exit(0); }\n" +
       "fs.appendFileSync(process.env.CAPTURE, JSON.stringify(process.argv.slice(2))+'\\n');\n" +
       "console.error(process.env.QUEUE_REPLY || '');process.exit(Number(process.env.QUEUE_CODE || 0));",
   );

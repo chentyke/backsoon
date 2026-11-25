@@ -303,7 +303,7 @@ dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .setup h1 { margin: 0 0 3px; font-size: 21px; line-height: 1.2; font-weight: 700; letter-spacing: -.03em; }
 .setup .dialog-body { gap: 8px; padding: 0 22px 22px; overflow: visible; }
 .setup .meta .status { min-height: 1.45em; }
-.setup[data-state=checking] .meta .status, .step:is([data-state=checking], [data-state=saving]) .step-state {
+.setup[data-state=checking] .meta .status, .step:is([data-state=checking], [data-state=saving], [data-state=sending]) .step-state {
   --status-ink: var(--muted);
   background: linear-gradient(90deg, var(--status-ink) 40%, var(--shine) 50%, var(--status-ink) 60%) 100% 0 / 250% 100%;
   -webkit-background-clip: text; background-clip: text; color: transparent;
@@ -351,7 +351,7 @@ dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 }
 .step-aside { display: flex; align-items: center; gap: 10px; line-height: 1.45; }
 .step-state { flex: none; font-size: 12px; font-weight: 620; color: var(--tone); white-space: nowrap; line-height: 21px; }
-.step[data-state=offer] .step-state { padding: 0 9px; border-radius: 99px; background: color-mix(in srgb, var(--tone) 12%, transparent); }
+.step:is([data-state=offer], [data-state=try]) .step-state { padding: 0 9px; border-radius: 99px; background: color-mix(in srgb, var(--tone) 12%, transparent); }
 .step .pips { display: flex; }
 .pip[data-state=skipped] { background: color-mix(in srgb, var(--ink) 14%, transparent); }
 

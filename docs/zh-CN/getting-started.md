@@ -28,7 +28,7 @@ backsoon setup
 npm i -g https://backsoon.dev/backsoon.tgz && backsoon setup
 ```
 
-setup 会安装技能，并在 `hooks.json` 注册任务完成通知。`~/.codex/AGENTS.md`（设置了 `CODEX_HOME` 时为该目录）中的 BackSoon 规则是推荐项而非必选：加入后，Codex 会主动把耗时命令交给 BackSoon。安装引导会先展示规则内容，你确认后才写入；没有浏览器时 setup 会在终端询问，非交互安装不会修改这个文件。用 `--rules` 加入规则，用 `--no-rules` 移除。加入后重复运行 setup 会保持规则为最新，并保留文件中的其他内容。只安装技能用 `backsoon setup --skill-only`。然后信任名为“BackSoon completion notices”的四个 hook：在 Codex 桌面版打开 **设置 › 钩子**，逐一点按 **信任**；如果只有 BackSoon 需要审核，可点按 **全部信任**。在 Codex 命令行输入 `/hooks`，在事件列表按 `t` 可一次信任全部四项。如果还有其他待审核的 hook，请逐一审核。
+setup 会安装技能，并在 `hooks.json` 注册任务完成通知。`~/.codex/AGENTS.md`（设置了 `CODEX_HOME` 时为该目录）中的 BackSoon 规则是推荐项而非必选：加入后，Codex 会主动把耗时命令交给 BackSoon。安装引导会先展示规则内容，你确认后才写入；没有浏览器时 setup 会在终端询问，非交互安装不会修改这个文件。用 `--rules` 加入规则，用 `--no-rules` 移除。加入后重复运行 setup 会保持规则为最新，并保留文件中的其他内容。只安装技能用 `backsoon setup --skill-only`。然后信任名为“BackSoon completion notices”的四个 hook：在 Codex 桌面版打开 **设置 › 钩子**，逐一点按 **信任**；如果只有 BackSoon 需要审核，可点按 **全部信任**。在 Codex 命令行输入 `/hooks`，在事件列表按 `t` 可一次信任全部四项。如果还有其他待审核的 hook，请逐一审核。设置完成后，引导页可以让 Codex 运行一个约 40 秒的示例任务，让你看到面板显示进度、结果回到对话。之后想再看一次，可以让 Codex 运行 `backsoon demo`。
 
 第一行安装命令和面板。第二行让 Codex 在其他项目中也能找到 Skill，只需执行一次。更新时重新运行安装命令即可。要卸载，先删除 setup 创建的符号链接 `~/.agents/skills/backsoon`，再运行 `npm uninstall -g backsoon`。
 

@@ -13,7 +13,7 @@ npm i -g backsoon
 backsoon setup
 ```
 
-setup은 스킬을 설치하고 완료 알림을 등록합니다. Codex 사이드 패널이나 기본 브라우저에서 설정 안내가 열리면 완료 알림을 승인할 수 있습니다. 안내에서는 전역 `AGENTS.md`에 넣을 권장 규칙도 보여 주며, 추가하거나 건너뛰고 나중에 제거할 수 있습니다. 브라우저가 없으면 setup이 터미널에서 묻습니다. 미리 정하려면 `--rules` 또는 `--no-rules`, 안내를 건너뛰려면 `--no-open`, 스킬만 설치하려면 `--skill-only`를 사용하세요.
+setup은 스킬을 설치하고 완료 알림을 등록합니다. Codex 사이드 패널이나 기본 브라우저에서 설정 안내가 열리면 완료 알림을 승인할 수 있습니다. 안내에서는 전역 `AGENTS.md`에 넣을 권장 규칙도 보여 주며, 추가하거나 건너뛰고 나중에 제거할 수 있습니다. 브라우저가 없으면 setup이 터미널에서 묻습니다. 미리 정하려면 `--rules` 또는 `--no-rules`, 안내를 건너뛰려면 `--no-open`, 스킬만 설치하려면 `--skill-only`를 사용하세요. 설정이 끝나면 안내에서 약 40초짜리 샘플 작업을 Codex에 보낼 수 있습니다. 패널에 진행 상황이 표시되고 결과가 대화로 돌아오는 모습을 볼 수 있습니다. 다시 보려면 Codex에 `backsoon demo`를 실행해 달라고 하세요.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/session-dark.ko.png">

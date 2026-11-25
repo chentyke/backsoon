@@ -7,7 +7,9 @@ import { setGlyph } from './glyphs.js';
 const dialog = document.querySelector('#task-window');
 const sheet = dialog.querySelector('.sheet');
 const groupsBox = sheet.querySelector('#activities');
-const notices = {received: 'received', steered: 'steered', queued: 'queued', failed: 'deliveryFailed', unknown: 'deliveryUnknown'};
+const notices = {received: 'received', resumed: 'resumed', steered: 'steered', queued: 'queued', failed: 'deliveryFailed', unknown: 'deliveryUnknown'};
+// An accepted message that could not start an idle chat waits for the user.
+const noticeKey = delivery => delivery.state === 'queued' && delivery.resumed === false ? 'queuedIdle' : notices[delivery.state];
 
 function renderDetails(task) {
   const box = sheet.querySelector("dl");
@@ -25,7 +27,7 @@ function renderDetails(task) {
     [msg('sampledAt'), task.sampled_at && new Date(task.sampled_at * 1000).toLocaleTimeString(locale)],
     [msg('stage'), task.stage], [msg('blocker'), task.blocker], [msg('progressError'), task.progress_error],
     [msg('notifyMode'), msg(task.notify ?? (task.thread ? "resume" : "off"))],
-    [msg('chatNotice'), delivery ? msg(notices[delivery.state]) : task.notify !== "off" ? msg('pending') : msg('disabled')],
+    [msg('chatNotice'), delivery ? msg(noticeKey(delivery)) : task.notify !== "off" ? msg('pending') : msg('disabled')],
     [msg('retryNotice'), delivery?.retryMessage && 'backsoon retry-notice ' + task.id],
     [msg('issues'), delivery?.issues || null], [msg('detail'), delivery?.detail],
   ];
@@ -108,7 +110,7 @@ function renderHero(task, view) {
   const items = task.activities || [];
   if (view.active && task.attached_pid && !task.progress_script && !items.length &&
       !task.output_files?.length && !task.latest && !task.stage) parts.push(msg('processOnly'));
-  if (task.notice?.state === 'queued') parts.push(msg('queued'));
+  if (task.notice?.state === 'queued') parts.push(msg(noticeKey(task.notice)));
   const needs = items.find(item => item.state === 'needsInput');
   if (needs) parts.unshift(format.activityText(needs) + ' — ' + msg('needsInput'));
   hint.textContent = parts.filter(Boolean).join(' / ');
