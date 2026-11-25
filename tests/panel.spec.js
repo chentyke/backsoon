@@ -300,6 +300,87 @@ test('setup guide adds the recommended rule only after confirmation, and can ski
   }
 });
 
+test('once setup is done the guide offers the sample task, sends it once and can retry a failure', async ({ page }) => {
+  const child = fork(entry, ['_onboard'], { cwd: dir, env: { ...process.env, CODEX_HOME: path.join(dir, 'codex-demo') },
+    stdio: ['ignore', 'ignore', 'ignore', 'ipc'] });
+  try {
+    const [reply] = await once(child, 'message');
+    const status = { rules: false, trusted: 4, total: 4, file: '~/.codex/AGENTS.md', demo: 'ready' };
+    const sends = [];
+    let failing = true;
+    await page.route('**/api/setup', route => route.fulfill({ json: status }));
+    await page.route('**/api/demo', route => {
+      sends.push(route.request().postDataJSON());
+      if (failing) return route.fulfill({ status: 502, json: { state: 'failed', detail: 'no app server' } });
+      status.demo = 'queued';
+      return route.fulfill({ json: { state: 'queued', detail: '' } });
+    });
+    await page.goto(reply.value);
+    await chooseLanguage(page, 'en');
+    const card = page.locator('#step-demo');
+    // Not offered while the rule is still undecided.
+    await expect(page.locator('#step-rules')).toHaveAttribute('data-state', 'offer');
+    await expect(card).toBeHidden();
+    await page.getByRole('button', { name: catalogs.en.guideSkip }).click();
+    await expect(card).toBeVisible();
+    await expect(card).toHaveAttribute('data-state', 'try');
+    await expect(page.locator('#demo')).toHaveText(catalogs.en.guideDemoBody);
+    await expect(page.locator('#lede')).toHaveText(catalogs.en.guideDoneBodyDemo);
+
+    await page.getByRole('button', { name: catalogs.en.guideDemoStart }).click();
+    await expect(card).toHaveAttribute('data-state', 'failed');
+    await expect(page.locator('#demo-error')).toHaveText(catalogs.en.guideDemoError.replace('{error}', 'no app server'));
+
+    failing = false;
+    await chooseLanguage(page, 'ko');
+    await page.getByRole('button', { name: catalogs.ko.guideDemoStart }).click();
+    await expect(card).toHaveAttribute('data-state', 'sent');
+    await expect(page.locator('#demo')).toHaveText(catalogs.ko.guideDemoSent);
+    await expect(page.locator('#lede')).toHaveText(catalogs.ko.guideDoneBody);
+    await expect(page.locator('#demo-fix')).toHaveAttribute('data-open', 'false');
+    await expect(page.locator('#demo-error')).toBeHidden();
+    expect(sends).toEqual([{ locale: 'en' }, { locale: 'ko' }]);
+
+    // After a reload the server still knows it was sent.
+    await page.reload();
+    await expect(card).toHaveAttribute('data-state', 'sent');
+
+    // Outside a Codex chat there is nothing to offer.
+    status.demo = null;
+    await page.reload();
+    await expect(page.locator('#step-rules')).toHaveAttribute('data-state', 'skipped');
+    await expect(card).toBeHidden();
+  } finally {
+    child.kill();
+  }
+});
+
+test('a confirmed completion shows that its original chat started processing it', async ({ page }) => {
+  const task = { id:'confirmed', name:'Build', status:'failed', code:1, started:100, ended:110, argv:['make'],
+    notice:{state:'resumed', turnId:'turn', issues:0} };
+  await page.route('**/api/tasks', route => route.fulfill({json:[task]}));
+  await page.route('**/api/logs/confirmed', route => route.fulfill({json:['make failed']}));
+  await page.goto(new URL('/', url).href);
+  await page.getByRole('button', {name:/Build/}).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.locator('#metadata summary').click();
+  await expect(dialog.locator('dl')).toContainText(catalogs.en.resumed);
+  await expect(dialog.locator('.dialog-head .status')).toHaveText(catalogs.en.failed);
+});
+
+test('a queued notification that did not resume the chat says how to deliver it', async ({ page }) => {
+  const task = { id:'idle', name:'Build', status:'failed', code:1, started:100, ended:110, argv:['make'],
+    notice:{state:'queued', resumed:false, issues:0, detail:'Warning: could not resume thread'} };
+  await page.route('**/api/tasks', route => route.fulfill({json:[task]}));
+  await page.route('**/api/logs/idle', route => route.fulfill({json:['make: *** [all] Error 1']}));
+  await page.goto(new URL('/', url).href);
+  await page.getByRole('button', {name:/Build/}).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.locator('.hint')).toContainText(catalogs.en.queuedIdle);
+  await dialog.locator('#metadata summary').click();
+  await expect(dialog.locator('dl')).toContainText(catalogs.en.queuedIdle);
+});
+
 test('a queued notification shows the resume warning only inside task details', async ({ page }) => {
   const task = { id:'done', name:'Build', status:'succeeded', code:0, started:100, ended:110, argv:['make'],
     notice:{state:'queued', issues:0, detail:'Warning: could not resume thread'} };

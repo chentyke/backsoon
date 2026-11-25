@@ -13,7 +13,7 @@ npm i -g backsoon
 backsoon setup
 ```
 
-setup 会安装技能并注册任务完成通知。安装引导会在 Codex 右侧或系统浏览器中打开，带你授权完成通知，并推荐在全局 `AGENTS.md` 加入一条 BackSoon 规则；你可以加入、略过，之后也能移除。没有浏览器时，setup 会在终端询问。用 `--rules` 或 `--no-rules` 预先决定，用 `--no-open` 跳过引导，或用 `--skill-only` 只安装技能。
+setup 会安装技能并注册任务完成通知。安装引导会在 Codex 右侧或系统浏览器中打开，带你授权完成通知，并推荐在全局 `AGENTS.md` 加入一条 BackSoon 规则；你可以加入、略过，之后也能移除。没有浏览器时，setup 会在终端询问。用 `--rules` 或 `--no-rules` 预先决定，用 `--no-open` 跳过引导，或用 `--skill-only` 只安装技能。设置完成后，引导页可以让 Codex 运行一个约 40 秒的示例任务，让你看到面板显示进度、结果回到对话。之后想再看一次，可以让 Codex 运行 `backsoon demo`。
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/session-dark.zh-CN.png">

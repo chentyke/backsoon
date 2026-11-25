@@ -6,6 +6,7 @@ import { rulesPath, setRules, setup, shortPath } from './setup.js';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { parseArgs } from 'node:util';
+import { fileURLToPath } from 'node:url';
 import {
   read,
   optional,
@@ -26,6 +27,7 @@ import { registerRoot, launch, serve } from './dashboard.js';
 import { guideAvailable, openSetupGuide, printDesktopLink } from './onboarding.js';
 import { chatLabel } from './chat.js';
 import { checkNoticeAccess, retryNotice } from './notify.js';
+import { codexCommand } from './codex.js';
 import { scriptPath } from './progress.js';
 
 const help = {
@@ -40,6 +42,7 @@ const help = {
   'retry-notice': 'retry-notice TASK_ID',
   resolve: msg('helpResolve'),
   setup: msg('helpSetup'),
+  demo: 'demo',
 };
 const common = {
   name: 'string',
@@ -63,6 +66,7 @@ const schema = {
   'wait-chat': { ...common, 'after-task': 'string', 'final-line': 'string', timeout: 'string' },
   resolve: { reason: 'string' },
   panel: { all: 'boolean', chat: 'string', task: 'string' },
+  demo: {},
 };
 function usage(action) {
   if (!action)
@@ -184,6 +188,11 @@ async function register(action, v, p, argv, rules) {
   const destination = notify === 'off' ? null : v.thread || thread;
   if (notify !== 'off' && !destination)
     throw Error(msg('noThread'));
+  // Codex marks commands it runs in its sandbox. A worker started there keeps
+  // the sandbox and cannot reach Codex when the task ends, so refuse before
+  // anything runs and let Codex start it again outside the sandbox.
+  if (notify !== 'off' && (process.env.CODEX_SANDBOX || process.env.CODEX_SANDBOX_NETWORK_DISABLED))
+    throw Error(msg('sandboxed'));
   let cwd = fs.realpathSync(v.cwd || '.');
   if (!fs.statSync(cwd).isDirectory()) throw Error(msg('badDirectory'));
   const interval = Number(v['progress-interval'] ?? 5);
@@ -232,6 +241,8 @@ async function register(action, v, p, argv, rules) {
     notify_thread: destination,
     notify,
     remote: v.remote ?? process.env.BACKSOON_REMOTE ?? null,
+    // The detached worker must reach the same CLI as this chat's shell.
+    codex: codexCommand(),
     match: v.match || null,
     alert_on: rules,
     progress_script: v['progress-script'] ? scriptPath(v['progress-script'], cwd) : null,
@@ -259,9 +270,9 @@ async function register(action, v, p, argv, rules) {
   console.log(startedId);
   if (startedId !== id) {
     console.error(msg('followUpExists', { id: startedId }));
-    return;
+    return startedId;
   }
-  if (noticeWarning) console.error(msg(noticeWarning, { id }));
+  if (noticeWarning) console.error(msg(noticeWarning, { id, cli: task.codex }));
   const desktop = process.env.CODEX_APP_TOOLS_PIPE_PATH;
   try {
     if (desktop && !v['no-panel']) {
@@ -270,17 +281,28 @@ async function register(action, v, p, argv, rules) {
     } else registerRoot(root);
   } catch (e) {
     console.error(msg('panelLaunchError', { error: e.message }));
-    return;
+    return startedId;
   }
   const notice = desktop && optional(path.join(root, id, 'notice.json'));
   if (notice && ['failed', 'unknown'].includes(notice.state)) {
     console.error(msg('handoffNoticeIssue', { id, detail: notice.detail || msg('deliveryUnknown') }));
-    return;
+    return startedId;
   }
   if (noticeWarning !== 'noticePermission' && desktop && ['resume', 'steer'].includes(notify) && destination === process.env.CODEX_THREAD_ID)
     console.error(
       msg('handoff'),
     );
+  return startedId;
+}
+// A sample task to see the panel and the chat notice, started here or by the
+// setup guide. Outside a Codex chat it runs for the panel alone.
+export function startDemo() {
+  return register('start', {
+    name: msg('demoName'),
+    'progress-script': fileURLToPath(new URL('./demo-progress.js', import.meta.url)),
+    'progress-interval': '1',
+    'no-notify': !process.env.CODEX_THREAD_ID,
+  }, [], [entry, '_demo'], {});
 }
 async function confirm(question) {
   const { createInterface } = await import('node:readline/promises');
@@ -314,6 +336,7 @@ export async function main([action, ...args]) {
     await receive(JSON.parse(input));
     return;
   }
+  if (action === '_demo') return (await import('./demo.js')).runDemo();
   if (action === '_observe' || action === '_watch') {
     const task = read(path.join(args[0], 'task.json'));
     if (action === '_hook') {
@@ -327,7 +350,7 @@ export async function main([action, ...args]) {
     else {
       const { waitChat } = await import('./chat.js');
       const results = await Promise.all((task.watch.chats || [task.watch.chat]).map(chat =>
-        waitChat({ ...task.watch, chat })));
+        waitChat({ ...task.watch, chat, codex: task.codex })));
       process.exitCode = results.some(code => code !== 0) ? 1 : 0;
     }
     return;
@@ -349,6 +372,7 @@ export async function main([action, ...args]) {
   const expected = ['attach', 'wait-chat', 'show', 'logs', 'stop', 'resolve', 'retry-notice'].includes(action) ? 1 : 0;
   if (action === 'wait-chat' ? !p.length : p.length !== expected) throw Error(usage(action));
   if (['start', 'wait-chat', 'attach'].includes(action)) return register(action, v, p, argv, rules);
+  if (action === 'demo') return startDemo();
   if (action === 'setup') {
     if (v.rules && v['no-rules']) throw Error(msg('rulesConflict'));
     const skillOnly = v['skill-only'];
@@ -385,7 +409,7 @@ export async function main([action, ...args]) {
   else if (action === 'logs') console.log(tail(dir).join('\n'));
   else if (action === 'retry-notice') {
     const notice = await retryNotice(dir, task);
-    if (['queued', 'steered', 'received'].includes(notice.state)) console.log(msg(notice.state));
+    if (['queued', 'resumed', 'steered', 'received'].includes(notice.state)) console.log(msg(notice.state));
     else throw Error(notice.detail);
   } else if (action === 'resolve') {
     const reason = v.reason?.trim();

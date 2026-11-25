@@ -7,6 +7,7 @@ import { once } from 'node:events';
 import { WebSocketServer } from 'ws';
 import { entry } from '../src/store.js';
 import { exec, sandbox, until } from './helpers.js';
+import { catalogs } from '../src/web/i18n.js';
 
 test('default notifications interrupt an active turn, resume an idle chat and avoid a second send after a lost acknowledgement', async (t) => {
   const h = sandbox(t),
@@ -27,8 +28,17 @@ test('default notifications interrupt an active turn, resume an idle chat and av
       if (!q.id) return;
       let result = {};
       if (q.method === 'thread/read')
-        result = { thread: { status: { type: behavior === 'unloaded' ? 'notLoaded' : behavior === 'idle' ? 'idle' : 'active' } } };
+        result = { thread: { status: { type: behavior === 'unloaded' ? 'notLoaded' : behavior.startsWith('idle') ? 'idle' : 'active' } } };
       if (q.method === 'thread/turns/list') result = { data: [{ id: 'turn', status: 'inProgress' }] };
+      if (q.method === 'turn/start') {
+        assert.equal(q.params.threadId, 'origin');
+        assert.match(q.params.input[0].text, /^\[BackSoon [a-f0-9]{12} done\]/);
+        if (behavior === 'idle-disconnect') {
+          client.terminate();
+          return;
+        }
+        result = { turn: { id: 'new-turn' } };
+      }
       if (q.method === 'turn/steer') {
         assert.equal(q.params.expectedTurnId, 'turn');
         if (behavior === 'disconnect') {
@@ -46,7 +56,8 @@ test('default notifications interrupt an active turn, resume an idle chat and av
   );
   for (const [mode, expected] of [
     ['active', 'steered'],
-    ['idle', 'queued'],
+    ['idle', 'resumed'],
+    ['idle-disconnect', 'unknown'],
     ['unloaded', 'queued'],
     ['rejected', 'queued'],
     ['disconnect', 'unknown'],
@@ -65,9 +76,11 @@ test('default notifications interrupt an active turn, resume an idle chat and av
     const n = await until(async () => JSON.parse(await h.cli('show', id)).notice);
     assert.equal(h.state(id).notify, 'steer');
     assert.equal(n.state, expected);
+    if (mode === 'idle') assert.equal(n.turnId, 'new-turn');
     if (expected === 'queued') assert.ok(h.calls().at(-1).includes('--resume'));
     assert.equal(h.calls().length - count, expected === 'queued' ? 1 : 0);
-    assert.equal(requests.filter((q) => q.method === 'turn/steer').length, ['idle', 'unloaded'].includes(mode) ? 0 : 1);
+    assert.equal(requests.filter((q) => q.method === 'turn/steer').length, mode.startsWith('idle') || mode === 'unloaded' ? 0 : 1);
+    assert.equal(requests.filter((q) => q.method === 'turn/start').length, mode.startsWith('idle') ? 1 : 0);
   }
   behavior = 'active';
   for (const mode of ['resume', 'queue', 'off']) {
@@ -139,7 +152,7 @@ test('a denied socket warns at launch and the command still runs with its existi
   }
 });
 
-test('a missing desktop socket warns at startup and preserves a queued result when resume fails', async t => {
+test('without a resume service, a queued completion counts as resumed only once its turn appears in the chat', async t => {
   const h = sandbox(t);
   delete h.env.BACKSOON_REMOTE;
   // macOS limits socket paths to 103 bytes, shorter than its usual temporary directory plus this socket name.
@@ -148,23 +161,34 @@ test('a missing desktop socket warns at startup and preserves a queued result wh
   Object.assign(h.env, {
     CODEX_HOME: profile,
     CODEX_APP_TOOLS_PIPE_PATH: 'desktop',
-    QUEUE_REPLY: 'Warning: message was queued, but could not resume thread',
+    QUEUE_REPLY: 'Queued message 01a21287-05f5-7923-bb93-ad4dca51bccf for thread origin.\n\nWarning: message was queued, but could not resume thread origin',
   });
-  const run = await exec(entry, ['start', '--no-panel', '--', 'sh', '-c', 'echo built'], { cwd:h.dir, env:h.env });
-  const id = run.stdout.trim();
-  assert.match(run.stderr, /direct resume service is unreachable/);
-  assert.doesNotMatch(run.stderr, /Notifications are enabled|lacks permission/);
-  const task = await until(async () => {
-    const result = JSON.parse(await h.cli('show', id));
-    return result.notice && result;
-  });
-  assert.equal(task.status, 'succeeded');
-  assert.equal(task.notice.state, 'queued');
-  assert.equal(task.notice.issues, 0);
-  assert.match(task.notice.detail, /ENOENT/);
-  assert.match(task.notice.detail, /could not resume thread/);
-  assert.equal(task.notice.retryMessage, undefined);
-  assert.deepEqual(h.calls().map(call => call.slice(0, 4)), [['queue', '--resume', '--thread', 'origin']]);
+  const notice = async (turn) => {
+    if (turn) h.env.NOTICE_TURN = turn; else delete h.env.NOTICE_TURN;
+    const run = await exec(entry, ['start', '--no-panel', '--', 'sh', '-c', 'echo built'], { cwd:h.dir, env:h.env });
+    const id = run.stdout.trim();
+    assert.match(run.stderr, /direct resume service is unreachable/);
+    assert.doesNotMatch(run.stderr, /Notifications are enabled|lacks permission/);
+    const task = await until(async () => {
+      const result = JSON.parse(await h.cli('show', id));
+      return result.notice && result.notice.state !== 'queued' || result.notice?.resumed === false ? result : null;
+    });
+    assert.equal(task.status, 'succeeded');
+    assert.equal(task.notice.retryMessage, undefined);
+    await assert.rejects(h.cli('retry-notice', id), /no confirmed unsent/);
+    return task.notice;
+  };
+  const taken = await notice('desktop-turn');
+  assert.equal(taken.state, 'resumed');
+  assert.equal(taken.turnId, 'desktop-turn');
+  assert.equal(taken.issues, 0);
+  const left = await notice(null);
+  assert.equal(left.state, 'queued');
+  assert.equal(left.resumed, false);
+  assert.equal(left.issues, 1);
+  assert.match(left.detail, /ENOENT/);
+  assert.match(left.detail, /could not resume thread/);
+  assert.deepEqual(h.calls().map(call => call.slice(0, 4)), [['queue', '--resume', '--thread', 'origin'], ['queue', '--resume', '--thread', 'origin']]);
   const queued = await exec(entry, ['start', '--notify', 'queue', '--no-panel', '--', 'true'], { cwd:h.dir, env:h.env });
   assert.equal(queued.stderr, '');
 });
@@ -194,7 +218,95 @@ test('show reports an earlier resume warning as queued and retains its diagnosti
   const file = path.join(h.env.BACKSOON_HOME, id, 'notice.json');
   const recorded = { state:'wake_warning', issues:2, detail:'Warning: message queued, but could not resume thread' };
   fs.writeFileSync(file, JSON.stringify(recorded));
-  assert.deepEqual(JSON.parse(await h.cli('show', id)).notice, {...recorded, state:'queued', issues:1});
+  assert.deepEqual(JSON.parse(await h.cli('show', id)).notice, {...recorded, state:'queued', resumed:false, issues:1});
   assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), recorded);
   await assert.rejects(h.cli('retry-notice', id), /no confirmed unsent/);
+  const unconfirmed = { state:'queued', wake:'unconfirmed', issues:1 };
+  fs.writeFileSync(file, JSON.stringify(unconfirmed));
+  assert.deepEqual(JSON.parse(await h.cli('show', id)).notice, { state:'queued', resumed:false, issues:1 });
+});
+
+test('inside the Codex sandbox a task that would notify is refused before anything runs', async t => {
+  const h = sandbox(t);
+  for (const variable of ['CODEX_SANDBOX', 'CODEX_SANDBOX_NETWORK_DISABLED']) {
+    const env = { ...h.env, [variable]: variable === 'CODEX_SANDBOX' ? 'seatbelt' : '1' };
+    for (const args of [['start', '--', 'sh', '-c', 'echo ran >> runs'], ['demo']])
+      await assert.rejects(exec(entry, args, { cwd: h.dir, env }), e => e.stderr.includes(catalogs.en.sandboxed));
+    assert.equal(fs.existsSync(path.join(h.dir, 'runs')), false);
+    assert.equal(fs.existsSync(h.env.BACKSOON_HOME) ? fs.readdirSync(h.env.BACKSOON_HOME).length : 0, 0);
+  }
+  // A panel-only task does not need to reach Codex.
+  Object.assign(h.env, { CODEX_SANDBOX: 'seatbelt' });
+  const id = await h.cli('start', '--notify', 'off', '--', 'true');
+  assert.equal((await h.ended(id)).status, 'succeeded');
+});
+
+async function idleChatService(t, dir) {
+  const socket = path.join(dir, 'ws.sock');
+  const server = http.createServer(), ws = new WebSocketServer({ server });
+  server.listen(socket);
+  await once(server, 'listening');
+  t.after(() => { ws.close(); server.close(); });
+  ws.on('connection', client => client.on('message', raw => {
+    const q = JSON.parse(raw);
+    if (q.id) client.send(JSON.stringify({ id: q.id, result: q.method === 'thread/read' ? { thread: { status: { type: 'idle' } } } : {} }));
+  }));
+  return 'unix://' + socket;
+}
+
+test('a CLI without queue --resume is warned about at startup and its accepted result is marked as not resumed', async t => {
+  const h = sandbox(t);
+  const remote = await idleChatService(t, h.dir);
+  Object.assign(h.env, { QUEUE_HELP: '      --remote <ADDR>' });
+  const run = await exec(entry, ['start', '--notify', 'resume', '--no-panel', '--remote', remote, '--', 'true'], { cwd: h.dir, env: h.env });
+  const id = run.stdout.trim();
+  assert.match(run.stderr, /has no queue --resume option, so BackSoon cannot ask Codex to resume this chat/);
+  const notice = await until(async () => JSON.parse(await h.cli('show', id)).notice);
+  assert.equal(notice.state, 'queued');
+  assert.equal(notice.resumed, false);
+  assert.match(notice.detail, /no queue --resume option/);
+  assert.equal(notice.retryMessage, undefined);
+  assert.deepEqual(h.calls().map(call => call.slice(0, 3)), [['queue', '--thread', 'origin']]);
+  await assert.rejects(h.cli('retry-notice', id), /no confirmed unsent/);
+});
+
+test('a resume request the CLI rejects before queueing can be retried once', async t => {
+  const h = sandbox(t);
+  Object.assign(h.env, { QUEUE_CODE: '2', QUEUE_REPLY: "error: unexpected argument '--resume' found" });
+  const id = await h.cli('start', '--', 'false');
+  const notice = await until(async () => JSON.parse(await h.cli('show', id)).notice);
+  assert.equal(notice.state, 'failed');
+  assert.equal(notice.issues, 1);
+  assert.match(notice.retryMessage, new RegExp('\\[BackSoon ' + id + ' done\\]'));
+  Object.assign(h.env, { QUEUE_CODE: '0', QUEUE_REPLY: '' });
+  assert.equal(await h.cli('retry-notice', id), catalogs.en.queued);
+  assert.equal(h.calls().length, 2);
+});
+
+test('the CLI that Codex desktop names is used before an older one on PATH', async t => {
+  const h = sandbox(t);
+  const app = path.join(h.dir, 'app');
+  fs.mkdirSync(app);
+  fs.writeFileSync(path.join(app, 'codex'), fs.readFileSync(path.join(h.dir, 'codex'), 'utf8').replaceAll('process.env.CAPTURE', "process.env.CAPTURE + '.app'").replace('process.env.QUEUE_HELP', 'undefined'));
+  fs.chmodSync(path.join(app, 'codex'), 0o700);
+  Object.assign(h.env, { CODEX_APP_RUNTIME_CLI_PATH: path.join(app, 'codex'), QUEUE_HELP: '' });
+  const id = await h.cli('start', '--', 'true');
+  assert.equal(h.state(id).codex, path.join(app, 'codex'));
+  await until(async () => JSON.parse(await h.cli('show', id)).notice);
+  assert.deepEqual(h.calls(), []);
+  const [call] = fs.readFileSync(h.env.CAPTURE + '.app', 'utf8').trim().split('\n').map(line => JSON.parse(line));
+  assert.deepEqual(call.slice(0, 4), ['queue', '--resume', '--thread', 'origin']);
+});
+
+test('a failed task notice carries the diagnostic above trailing output and points to the full log', async t => {
+  const h = sandbox(t);
+  const script = 'echo "AssertionError: Expected 1 to equal 2" >&2; for i in 1 2 3 4 5 6 7 8; do echo "    at frame $i" >&2; done; echo "Node.js v22.12.0" >&2; exit 1';
+  const id = await h.cli('start', '--', 'sh', '-c', script);
+  await until(async () => JSON.parse(await h.cli('show', id)).notice);
+  const message = h.calls().at(-1).at(h.calls().at(-1).indexOf('--message') + 1);
+  assert.match(message, new RegExp('^\\[BackSoon ' + id + ' done\\]'));
+  assert.match(message, /exit code 1/);
+  assert.match(message, /AssertionError: Expected 1 to equal 2\n…\n/);
+  assert.match(message, /Node\.js v22\.12\.0\nFull log: backsoon logs /);
+  assert.ok(message.endsWith('backsoon logs ' + id));
 });

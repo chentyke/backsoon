@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { msg } from './locale.js';
+import { codexCommand } from './codex.js';
 export class Rejected extends Error {
   constructor(error, method) {
     super(String(error.message || msg('rpcRejected')).slice(0, 400));
@@ -56,8 +57,8 @@ export class Rpc {
   }
 }
 
-export function openAppServer() {
-  const child = spawn('codex', ['app-server', '--stdio'], { stdio: ['pipe', 'pipe', 'ignore'] });
+export function openAppServer(command = codexCommand()) {
+  const child = spawn(command, ['app-server', '--stdio'], { stdio: ['pipe', 'pipe', 'ignore'] });
   const api = new Rpc((msg) => child.stdin.write(JSON.stringify(msg) + '\n'));
   const lines = createInterface({ input: child.stdout });
   lines.on('line', (line) => api.receive(line));

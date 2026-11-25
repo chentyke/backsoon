@@ -112,8 +112,14 @@ export function status(dir) {
   task.percent = taskPercent(task);
   task.notice = optional(path.join(dir, 'notice.json'));
   // Older records counted a failed resume request as a delivery issue after queueing succeeded.
+  // An unconfirmed pickup was briefly recorded as `wake: 'unconfirmed'`.
+  if (task.notice?.wake === 'unconfirmed') {
+    const { wake, ...rest } = task.notice;
+    task.notice = { ...rest, resumed: false };
+  }
   if (task.notice?.state === 'wake_warning') {
     task.notice.state = 'queued';
+    task.notice.resumed = false;
     task.notice.issues = Math.max(0, (task.notice.issues ?? 1) - 1);
   }
   return task;

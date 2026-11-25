@@ -103,7 +103,7 @@ export async function waitChat(config) {
   report('running');
   console.log(msg('awaitReply', { chat: config.chat }));
   while (Date.now() < end) {
-    const { api, close } = openAppServer();
+    const { api, close } = openAppServer(config.codex);
     try {
       await api.initialize(end);
       while (Date.now() < end) {

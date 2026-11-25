@@ -14,6 +14,12 @@ const LOOK = {
   added: { glyph: 'succeeded', tone: 'green', label: 'guideStateAdded' },
   offer: { glyph: 'recommended', tone: 'blue', label: 'guideStateRecommended' },
   skipped: { glyph: 'skipped', tone: 'grey', label: 'guideStateSkipped' },
+  // the sample task, once setup is done
+  try: { glyph: 'recommended', tone: 'blue', label: 'guideStateOptional' },
+  sending: { glyph: 'spin', tone: 'blue', label: 'guideSending' },
+  sent: { glyph: 'succeeded', tone: 'green', label: 'guideStateSent' },
+  maybe: { glyph: 'warning', tone: 'amber', label: 'guideStateUncertain' },
+  failed: { glyph: 'failed', tone: 'red', label: 'guideStateNotSent' },
 };
 const SKIP_KEY = 'backsoon-rules-skipped';
 const $ = selector => document.querySelector(selector);
@@ -25,6 +31,7 @@ const WHERE_KEY = 'backsoon-hooks-where';
 const CELEBRATED_KEY = 'backsoon-celebrated';
 let complete, celebrated = false;
 let status, checking = true, saving = false, error = '', checkedAt, painted = false, skipped = false, where;
+let sendingDemo = false, demoError = '';
 try {
   skipped = localStorage.getItem(SKIP_KEY) === '1';
   where = localStorage.getItem(WHERE_KEY);
@@ -89,6 +96,15 @@ function paintStep(step, state, text, animate) {
   if (text != null) swapText(step.querySelector('[role=status]'), text, animate);
 }
 
+// The server knows whether this guide already sent the sample task, so a
+// reload never offers it twice.
+function demoState() {
+  if (sendingDemo) return 'sending';
+  if (demoError) return 'failed';
+  return { ready: 'try', steered: 'sent', queued: 'sent', unknown: 'maybe' }[status?.demo] ?? null;
+}
+const DEMO_TEXT = { try: 'guideDemoBody', sent: 'guideDemoSent', maybe: 'guideDemoUnknown', failed: 'guideDemoBody' };
+
 const RULES_TEXT = { added: 'guideAdded', offer: 'guideMissing', skipped: 'guideSkipped', unknown: 'guideRulesUnknown' };
 function render() {
   const animate = painted;
@@ -146,13 +162,34 @@ function render() {
     try { localStorage.setItem(CELEBRATED_KEY, '1'); } catch {}
     celebrate(setup.querySelector('.tile'));
   }
+  // The sample task is offered once nothing is left to do, in a chat that ran
+  // setup; after it is sent the card stays to say so.
+  const demo = demoState(), demoCard = $('#step-demo');
+  const offerDemo = Boolean(demo && (done || demo !== 'try'));
+  if (offerDemo) {
+    if (demoCard.hidden && animate && !still()) demoCard.animate(RISE, { duration: 420, easing: 'cubic-bezier(.22, 1, .36, 1)' });
+    paintStep(demoCard, demo, demo === 'sending' ? null : msg(DEMO_TEXT[demo]), animate && !demoCard.hidden);
+  }
+  demoCard.hidden = !offerDemo;
+  $('#demo-fix').dataset.open = String(demo === 'try' || demo === 'failed');
+  $('#start-demo').disabled = sendingDemo;
+  const demoFailure = $('#demo-error');
+  demoFailure.hidden = !demoError;
+  demoFailure.textContent = demoError && msg('guideDemoError', { error: demoError });
+
   const wasReady = setup.dataset.state === 'ready';
   setup.dataset.state = overall;
   setup.dataset.tone = LOOK[overall].tone;
   setup.setAttribute('aria-busy', String(checking || saving));
   setGlyph($('#overall-glyph'), LOOK[overall].glyph, animate);
   swapText($('#overall'), msg(overall === 'ready' ? 'guideAllSet' : LOOK[overall].label), animate);
-  swapText($('#lede'), msg(overall === 'ready' ? 'guideDoneBody' : 'guideLede'), animate && wasReady !== (overall === 'ready'));
+  // While the sample task is on offer, the lede points to it instead of
+  // saying the page can be closed.
+  const lede = overall !== 'ready' ? 'guideLede' :
+    offerDemo && ['try', 'sending', 'failed'].includes(demo) ? 'guideDoneBodyDemo' : 'guideDoneBody';
+  const ledeEl = $('#lede'), ledeChanged = ledeEl.dataset.key !== lede;
+  ledeEl.dataset.key = lede;
+  swapText(ledeEl, msg(lede), animate && (wasReady !== (overall === 'ready') || ledeChanged));
   for (const li of document.querySelectorAll('[data-rich]')) rich(li, li.dataset.rich);
   $('#checked').textContent = checkedAt ? msg('guideChecked', {
     time: new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(checkedAt),
@@ -217,6 +254,30 @@ async function changeRules(enabled) {
   }
 }
 
+async function startDemo() {
+  if (sendingDemo) return;
+  sendingDemo = true;
+  demoError = '';
+  render();
+  const started = performance.now();
+  try {
+    const response = await fetch('/api/demo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-BackSoon-Guide': '1', 'X-BackSoon-Token': token },
+      body: JSON.stringify({ locale }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw Error(data.detail || 'HTTP ' + response.status);
+    status = { ...status, demo: data.state };
+  } catch (failure) {
+    demoError = failure.message;
+  } finally {
+    await settle(started, 360);
+    sendingDemo = false;
+    render();
+  }
+}
+
 for (const tab of document.querySelectorAll('[data-where]')) {
   tab.onclick = () => {
     where = tab.dataset.where;
@@ -231,6 +292,7 @@ for (const tab of document.querySelectorAll('[data-where]')) {
   };
 }
 $('#add-rules').onclick = () => changeRules(true);
+$('#start-demo').onclick = startDemo;
 $('#skip-rules').onclick = () => { remember(true); error = ''; render(); };
 $('#rules-toggle').onclick = () => {
   if (status?.rules === true) return changeRules(false);

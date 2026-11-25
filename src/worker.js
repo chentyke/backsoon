@@ -4,9 +4,9 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { Output } from './output.js';
-import { commandResult } from './task.js';
+import { commandResult, failureExcerpt } from './task.js';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { read, save, now, identity, entry } from './store.js';
+import { read, save, now, identity, entry, tail } from './store.js';
 import { Estimate, pastRange, sample, signalGroup } from './progress.js';
 import { ciQuery, sampleCI, setActivity } from './activity.js';
 import { Notifications } from './notify.js';
@@ -181,5 +181,8 @@ export async function run(dir, ready) {
   });
   save(file, task);
   const code = task.code == null ? '' : msg('noticeExit', { code: task.code });
-  await notices?.send(msg('finished', { state: msg(task.status), code, output: task.latest || msg('none') }), true);
+  const failed = task.status === 'failed' && failureExcerpt(tail(dir, 40));
+  await notices?.send(failed
+    ? msg('finishedFailed', { state: msg(task.status), code, output: failed, id: task.id })
+    : msg('finished', { state: msg(task.status), code, output: task.latest || msg('none') }), true);
 }

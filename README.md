@@ -13,7 +13,7 @@ npm i -g backsoon
 backsoon setup
 ```
 
-Setup installs the skill and registers completion notifications. The setup guide opens in the Codex side panel or your default browser. It shows how to authorize the notifications and offers a recommended rule for your global `AGENTS.md`, which you can add, skip or remove later. Without a browser, setup asks in the terminal. Use `--rules` or `--no-rules` to decide up front, `--no-open` to skip the guide, or `--skill-only` to install just the skill.
+Setup installs the skill and registers completion notifications. The setup guide opens in the Codex side panel or your default browser. It shows how to authorize the notifications and offers a recommended rule for your global `AGENTS.md`, which you can add, skip or remove later. Without a browser, setup asks in the terminal. Use `--rules` or `--no-rules` to decide up front, `--no-open` to skip the guide, or `--skill-only` to install just the skill. When setup is done, the guide can send Codex a 40-second sample task, so you can watch the panel and see the result come back to the chat. To see it again later, ask Codex to run `backsoon demo`.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/chentyke/backsoon/main/docs/images/session-dark.png">
